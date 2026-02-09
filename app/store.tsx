@@ -1,0 +1,433 @@
+import { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Switch, Alert, ActivityIndicator, Modal } from 'react-native';
+import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ArrowLeft, Store, Printer, Save, MapPin, Phone, FileText, CreditCard, X } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import tw from 'twrnc';
+
+import { ConfirmationModal } from '../components/ConfirmationModal';
+import { ReceiptPreview } from '../components/ReceiptPreview';
+import { useOffline } from '../context/OfflineContext';
+
+export default function StoreScreen() {
+    const router = useRouter();
+    const insets = useSafeAreaInsets();
+    const [loading, setLoading] = useState(true);
+    const [showPreviewModal, setShowPreviewModal] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const { isManualOffline, setManualOffline } = useOffline();
+
+    // Store Identity
+    const [storeName, setStoreName] = useState('');
+    const [storeAddress, setStoreAddress] = useState('');
+    const [storePhone, setStorePhone] = useState('');
+    const [openTime, setOpenTime] = useState('');
+    const [closeTime, setCloseTime] = useState('');
+    const [footerMessage, setFooterMessage] = useState('');
+
+    // Printer Settings
+    const [autoPrint, setAutoPrint] = useState(false);
+    const [paperSize, setPaperSize] = useState('58mm'); // 58mm or 80mm
+
+    // Payment Methods
+    const [enableQris, setEnableQris] = useState(true);
+    const [enableTransfer, setEnableTransfer] = useState(true);
+    const [enableDebit, setEnableDebit] = useState(true);
+    const [enableCredit, setEnableCredit] = useState(true);
+
+    // Receipt Content Settings
+    const [showTableNumber, setShowTableNumber] = useState(true);
+    const [showCustomerName, setShowCustomerName] = useState(true);
+    const [showCashierName, setShowCashierName] = useState(true);
+    const [showServerName, setShowServerName] = useState(true);
+    const [showOrderDate, setShowOrderDate] = useState(true);
+    const [showDiscount, setShowDiscount] = useState(true);
+    const [showPreviewBeforePay, setShowPreviewBeforePay] = useState(false);
+
+    // Notification Modal State
+    const [showStatusModal, setShowStatusModal] = useState(false);
+    const [statusModalConfig, setStatusModalConfig] = useState({
+        title: '',
+        message: '',
+        type: 'info' as 'info' | 'success' | 'danger' | 'warning',
+        onConfirm: () => { }
+    });
+
+    // ...
+
+    useEffect(() => {
+        console.log('StoreScreen: Loading settings...');
+        const timer = setTimeout(() => {
+            if (loading) {
+                console.warn('StoreScreen: Loading timed out');
+                setLoading(false);
+                Alert.alert('Warning', 'Gagal memuat pengaturan (Timeout).');
+            }
+        }, 8000);
+
+        loadSettings().then(() => clearTimeout(timer));
+
+        return () => clearTimeout(timer);
+    }, []);
+
+    const loadSettings = async () => {
+        try {
+            const settings = await AsyncStorage.getItem('store_settings');
+            if (settings) {
+                const parsed = JSON.parse(settings);
+                setStoreName(parsed.storeName || '');
+                setStoreAddress(parsed.storeAddress || '');
+                setStorePhone(parsed.storePhone || '');
+                setOpenTime(parsed.openTime || '08:00');
+                setCloseTime(parsed.closeTime || '22:00');
+                setFooterMessage(parsed.footerMessage || '');
+                setPaperSize(parsed.paperSize || '58mm');
+                setAutoPrint(parsed.autoPrint || false);
+
+                // Payment Methods
+                setEnableQris(parsed.enableQris !== false);
+                setEnableTransfer(parsed.enableTransfer !== false);
+                setEnableDebit(parsed.enableDebit !== false);
+                setEnableCredit(parsed.enableCredit !== false);
+
+                // Receipt Content
+                setShowTableNumber(parsed.showTableNumber !== false);
+                setShowCustomerName(parsed.showCustomerName !== false);
+                setShowCashierName(parsed.showCashierName !== false);
+                setShowServerName(parsed.showServerName !== false);
+                setShowOrderDate(parsed.showOrderDate !== false);
+                setShowDiscount(parsed.showDiscount !== false);
+                setShowPreviewBeforePay(parsed.showPreviewBeforePay || false);
+            } else {
+                setStoreName('Toko Saya');
+                setFooterMessage('Terima Kasih atas Kunjungan Anda');
+            }
+        } catch (error) {
+            console.error('Failed to load settings', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            const settings = {
+                storeName,
+                storeAddress,
+                storePhone,
+                openTime,
+                closeTime,
+                autoPrint,
+                paperSize,
+                footerMessage,
+                enableQris,
+                enableTransfer,
+                enableDebit,
+                enableCredit,
+                showTableNumber,
+                showCustomerName,
+                showCashierName,
+                showServerName,
+                showOrderDate,
+                showDiscount,
+                showPreviewBeforePay
+            };
+            await AsyncStorage.setItem('store_settings', JSON.stringify(settings));
+            setStatusModalConfig({
+                title: 'Sukses',
+                message: 'Pengaturan toko berhasil disimpan',
+                type: 'success',
+                onConfirm: () => {
+                    setShowStatusModal(false);
+                    router.back();
+                }
+            });
+            setShowStatusModal(true);
+        } catch (error) {
+            setStatusModalConfig({
+                title: 'Eror',
+                message: 'Gagal menyimpan pengaturan',
+                type: 'danger',
+                onConfirm: () => setShowStatusModal(false)
+            });
+            setShowStatusModal(true);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <View style={tw`flex-1 items-center justify-center bg-gray-50`}>
+                <ActivityIndicator size="large" color="#2563eb" />
+            </View>
+        );
+    }
+
+    return (
+        <View style={[tw`flex-1 bg-gray-50`, { paddingTop: insets.top }]}>
+            {/* Header */}
+            <View style={tw`bg-white px-4 py-3 flex-row items-center justify-between border-b border-gray-200 shadow-sm`}>
+                <View style={tw`flex-row items-center`}>
+                    <TouchableOpacity onPress={() => router.back()} style={tw`p-2 -ml-2 rounded-full hover:bg-gray-100`}>
+                        <ArrowLeft size={24} color="#1f2937" />
+                    </TouchableOpacity>
+                    <Text style={tw`text-lg font-bold text-gray-900 ml-2`}>Pengaturan Toko</Text>
+                </View>
+                <TouchableOpacity
+                    onPress={handleSave}
+                    disabled={saving}
+                    style={tw`bg-blue-600 p-2 rounded-lg flex-row items-center gap-2 px-3 ${saving ? 'opacity-50' : ''}`}
+                >
+                    {saving ? <ActivityIndicator size="small" color="white" /> : <Save size={20} color="white" />}
+                    <Text style={tw`text-white font-bold text-sm`}>Simpan</Text>
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={tw`p-3 pb-10`}>
+
+                {/* Store Identity & Printer Combined Card for compactness */}
+                <View style={tw`bg-white p-3 rounded-xl border border-gray-200 shadow-sm mb-3`}>
+                    <Text style={tw`text-gray-900 font-bold mb-3 text-base`}>Identitas & Printer</Text>
+
+                    <View style={tw`flex-row gap-3 mb-3`}>
+                        <View style={tw`flex-1`}>
+                            <Text style={tw`text-gray-500 text-xs mb-1`}>Nama Toko</Text>
+                            <TextInput
+                                style={tw`bg-gray-50 border border-gray-200 rounded-lg p-2 text-gray-900 font-bold text-sm`}
+                                value={storeName}
+                                onChangeText={setStoreName}
+                                placeholder="Nama Toko"
+                            />
+                        </View>
+                        <View style={tw`flex-1`}>
+                            <Text style={tw`text-gray-500 text-xs mb-1`}>No. Telepon</Text>
+                            <TextInput
+                                style={tw`bg-gray-50 border border-gray-200 rounded-lg p-2 text-gray-900 text-sm`}
+                                value={storePhone}
+                                onChangeText={setStorePhone}
+                                placeholder="08xx-xxxx-xxxx"
+                                keyboardType="phone-pad"
+                            />
+                        </View>
+                    </View>
+
+                    <View style={tw`mb-3`}>
+                        <Text style={tw`text-gray-500 text-xs mb-1`}>Alamat</Text>
+                        <TextInput
+                            style={tw`bg-gray-50 border border-gray-200 rounded-lg p-2 text-gray-900 h-16 text-sm`}
+                            value={storeAddress}
+                            onChangeText={setStoreAddress}
+                            placeholder="Alamat lengkap..."
+                            multiline
+                            textAlignVertical="top"
+                        />
+                    </View>
+
+                    <View style={tw`flex-row gap-3 mb-3`}>
+                        <View style={tw`flex-1`}>
+                            <Text style={tw`text-gray-500 text-xs mb-1`}>Buka</Text>
+                            <TextInput
+                                value={openTime}
+                                onChangeText={setOpenTime}
+                                placeholder="08:00"
+                                style={tw`border border-gray-200 rounded-lg p-2 bg-gray-50 text-gray-900 text-center text-sm`}
+                            />
+                        </View>
+                        <View style={tw`flex-1`}>
+                            <Text style={tw`text-gray-500 text-xs mb-1`}>Tutup</Text>
+                            <TextInput
+                                value={closeTime}
+                                onChangeText={setCloseTime}
+                                placeholder="22:00"
+                                style={tw`border border-gray-200 rounded-lg p-2 bg-gray-50 text-gray-900 text-center text-sm`}
+                            />
+                        </View>
+                        <View style={tw`flex-1`}>
+                            <Text style={tw`text-gray-500 text-xs mb-1`}>Kertas</Text>
+                            <View style={tw`flex-row bg-gray-50 rounded-lg border border-gray-200 overflow-hidden`}>
+                                <TouchableOpacity
+                                    onPress={() => setPaperSize('58mm')}
+                                    style={tw`flex-1 p-2 items-center ${paperSize === '58mm' ? 'bg-blue-100' : ''}`}
+                                >
+                                    <Text style={tw`text-xs ${paperSize === '58mm' ? 'font-bold text-blue-700' : 'text-gray-500'}`}>58</Text>
+                                </TouchableOpacity>
+                                <View style={tw`w-[1px] bg-gray-200`} />
+                                <TouchableOpacity
+                                    onPress={() => setPaperSize('80mm')}
+                                    style={tw`flex-1 p-2 items-center ${paperSize === '80mm' ? 'bg-blue-100' : ''}`}
+                                >
+                                    <Text style={tw`text-xs ${paperSize === '80mm' ? 'font-bold text-blue-700' : 'text-gray-500'}`}>80</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+
+                    <View style={tw`mb-3`}>
+                        <Text style={tw`text-gray-500 text-xs mb-1`}>Footer Struk</Text>
+                        <TextInput
+                            style={tw`bg-gray-50 border border-gray-200 rounded-lg p-2 text-gray-900 text-sm`}
+                            value={footerMessage}
+                            onChangeText={setFooterMessage}
+                            placeholder="Pesan di bawah struk..."
+                        />
+                    </View>
+
+                    <View style={tw`flex-row items-center justify-between pt-2 border-t border-gray-100`}>
+                        <View style={tw`flex-row items-center gap-2`}>
+                            <Printer size={16} color="#4b5563" />
+                            <Text style={tw`text-gray-700 font-medium text-sm`}>Auto Print Struk</Text>
+                        </View>
+                        <Switch
+                            value={autoPrint}
+                            onValueChange={setAutoPrint}
+                            trackColor={{ false: '#e5e7eb', true: '#BFDBFE' }}
+                            thumbColor={autoPrint ? '#2563eb' : '#f3f4f6'}
+                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                        />
+                    </View>
+
+                    {/* Offline Mode Toggle */}
+                    <View style={tw`flex-row items-center justify-between pt-3 mt-2 border-t border-gray-100`}>
+                        <View style={tw`flex-1 mr-4`}>
+                            <View style={tw`flex-row items-center gap-2`}>
+                                <View style={[tw`w-2 h-2 rounded-full`, isManualOffline ? tw`bg-orange-500` : tw`bg-gray-300`]} />
+                                <Text style={tw`text-gray-900 font-bold text-sm`}>Mode Offline</Text>
+                            </View>
+                            <Text style={tw`text-gray-500 text-[10px] mt-0.5`}>
+                                Paksa aplikasi berjalan offline. Data akan disinkronkan saat online kembali.
+                            </Text>
+                        </View>
+                        <Switch
+                            value={isManualOffline}
+                            onValueChange={(val) => setManualOffline(val)}
+                            trackColor={{ false: '#e5e7eb', true: '#FED7AA' }}
+                            thumbColor={isManualOffline ? '#f97316' : '#f3f4f6'}
+                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                        />
+                    </View>
+                </View>
+
+                <View style={tw`flex-row gap-3`}>
+                    {/* Left Column: Receipt Info */}
+                    <View style={tw`flex-1 bg-white p-3 rounded-xl border border-gray-200 shadow-sm mb-3`}>
+                        <Text style={tw`text-gray-900 font-bold mb-2 text-sm`}>Tampilan Struk</Text>
+                        {[
+                            { label: 'No. Meja', value: showTableNumber, setter: setShowTableNumber },
+                            { label: 'Nama Pelanggan', value: showCustomerName, setter: setShowCustomerName },
+                            { label: 'Nama Kasir', value: showCashierName, setter: setShowCashierName },
+                            { label: 'Waktu Order', value: showOrderDate, setter: setShowOrderDate },
+                            { label: 'Preview Bayar', value: showPreviewBeforePay, setter: setShowPreviewBeforePay },
+                        ].map((item, index) => (
+                            <View key={index} style={tw`flex-row items-center justify-between py-1.5 border-b border-gray-50 last:border-0`}>
+                                <Text style={tw`text-gray-600 text-xs flex-1`}>{item.label}</Text>
+                                <Switch
+                                    value={item.value}
+                                    onValueChange={item.setter}
+                                    trackColor={{ false: '#e5e7eb', true: '#BFDBFE' }}
+                                    thumbColor={item.value ? '#2563eb' : '#f3f4f6'}
+                                    style={{ transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] }}
+                                />
+                            </View>
+                        ))}
+                    </View>
+
+                    {/* Right Column: Payments */}
+                    <View style={tw`flex-1 bg-white p-3 rounded-xl border border-gray-200 shadow-sm mb-3`}>
+                        <Text style={tw`text-gray-900 font-bold mb-2 text-sm`}>Pembayaran</Text>
+                        {[
+                            { label: 'QRIS', value: enableQris, setter: setEnableQris },
+                            { label: 'Transfer', value: enableTransfer, setter: setEnableTransfer },
+                            { label: 'Debit', value: enableDebit, setter: setEnableDebit },
+                            { label: 'Kredit', value: enableCredit, setter: setEnableCredit },
+                        ].map((item, index) => (
+                            <View key={index} style={tw`flex-row items-center justify-between py-1.5 border-b border-gray-50 last:border-0`}>
+                                <Text style={tw`text-gray-600 text-xs flex-1`}>{item.label}</Text>
+                                <Switch
+                                    value={item.value}
+                                    onValueChange={item.setter}
+                                    trackColor={{ false: '#e5e7eb', true: '#BFDBFE' }}
+                                    thumbColor={item.value ? '#2563eb' : '#f3f4f6'}
+                                    style={{ transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] }}
+                                />
+                            </View>
+                        ))}
+                    </View>
+                </View>
+
+                {/* Preview is heavy, maybe just a button to show modal, or keep small */}
+                <TouchableOpacity
+                    style={tw`bg-gray-100 p-3 rounded-xl items-center border border-gray-200 active:bg-gray-200`}
+                    onPress={() => setShowPreviewModal(true)}
+                >
+                    <Text style={tw`text-gray-600 font-medium text-xs`}>Tap untuk Preview Struk (Popup)</Text>
+                </TouchableOpacity>
+
+                <View style={tw`items-center mt-4`}>
+                    <Text style={tw`text-gray-300 text-[10px]`}>Device ID: {Math.random().toString(36).substring(7).toUpperCase()}</Text>
+                </View>
+
+            </ScrollView>
+
+            {/* Preview Modal */}
+            <Modal
+                visible={showPreviewModal}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowPreviewModal(false)}
+            >
+                <View style={tw`flex-1 bg-gray-50`}>
+                    <View style={tw`px-4 py-3 bg-white border-b border-gray-200 flex-row items-center justify-between`}>
+                        <Text style={tw`font-bold text-lg text-gray-900`}>Preview Struk</Text>
+                        <TouchableOpacity onPress={() => setShowPreviewModal(false)} style={tw`p-2 bg-gray-100 rounded-full`}>
+                            <X size={24} color="#374151" />
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView contentContainerStyle={tw`p-6 items-center`}>
+                        <ReceiptPreview
+                            storeName={storeName}
+                            storeAddress={storeAddress}
+                            storePhone={storePhone}
+                            footerMessage={footerMessage}
+                            paperSize={paperSize as '58mm' | '80mm'}
+                            showTableNumber={showTableNumber}
+                            showCustomerName={showCustomerName}
+                            showCashierName={showCashierName}
+                            showServerName={showServerName}
+                            showOrderDate={showOrderDate}
+                            showDiscount={showDiscount}
+                            // Mock Data for Preview
+                            items={[
+                                { product: { name: 'Kopi Susu Gula Aren', price: 18000 }, quantity: 2 } as any,
+                                { product: { name: 'Roti Bakar Coklat', price: 15000 }, quantity: 1 } as any,
+                            ]}
+                            subtotal={51000}
+                            total={51000}
+                            customer={{ name: 'Budi Santoso' } as any}
+                            tableNumber="05"
+                        />
+                        <TouchableOpacity
+                            onPress={() => setShowPreviewModal(false)}
+                            style={tw`mt-8 bg-black px-6 py-3 rounded-xl`}
+                        >
+                            <Text style={tw`text-white font-bold`}>Tutup Preview</Text>
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            </Modal>
+
+            <ConfirmationModal
+                visible={showStatusModal}
+                title={statusModalConfig.title}
+                message={statusModalConfig.message}
+                type={statusModalConfig.type}
+                confirmText="OK"
+                cancelText={null}
+                onConfirm={statusModalConfig.onConfirm}
+                onCancel={() => setShowStatusModal(false)}
+            />
+        </View >
+    );
+}
