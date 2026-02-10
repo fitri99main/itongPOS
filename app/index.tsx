@@ -34,7 +34,13 @@ export default function Home() {
     const { showTable, showRecall: showRecallPref, showGuest, showManual } = settings;
 
     // Responsive Column Calculation
-    const panelWidth = isSplitView ? 320 : 0;
+    // Responsive scaling - Dynamic Panel Width
+    let panelWidth = 0;
+    if (isSplitView) {
+        // For tablets, use a percentage or restricted fixed width
+        // If width < 900, use smaller 280px, otherwise 350px
+        panelWidth = width < 900 ? Math.max(250, width * 0.3) : 350;
+    }
     const availableWidth = width - panelWidth;
 
     let numColumns = 3;

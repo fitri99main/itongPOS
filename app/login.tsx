@@ -75,13 +75,13 @@ export default function Login() {
 
                         {/* Form Section */}
                         <View style={tw`gap-5`}>
-                            {/* Email Input */}
+                            {/* Identifier Input */}
                             <View>
-                                <Text style={tw`text-gray-700 font-medium mb-2 ml-1`}>Email Address</Text>
+                                <Text style={tw`text-gray-700 font-medium mb-2 ml-1`}>Username atau Email</Text>
                                 <View style={tw`flex-row items-center bg-gray-50 border border-gray-200 rounded-2xl px-4 h-14`}>
                                     <Mail size={20} color="#9ca3af" />
                                     <TextInput
-                                        placeholder="nama@email.com"
+                                        placeholder="Username, Nama Lengkap, atau Email"
                                         placeholderTextColor="#9ca3af"
                                         value={email}
                                         onChangeText={setEmail}

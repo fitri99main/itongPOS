@@ -27,9 +27,9 @@ export function HeaderModern() {
         <View style={{ paddingTop: insets.top, backgroundColor: 'white' }}>
             <View style={tw`flex-row items-center justify-between px-5 py-4`}>
                 {/* Removed border-b, added more padding for specious feel */}
-                <View style={tw`flex-row items-center gap-3`}>
+                <View style={[tw`flex-row items-center`, { gap: width > 800 ? 12 : 6 }]}>
                     <View>
-                        <Text style={tw`font-extrabold ${storeNameSize} text-slate-800 tracking-tight`}>{settings.storeName}</Text>
+                        <Text style={tw`font-extrabold ${storeNameSize} text-slate-800 tracking-tight`} numberOfLines={1}>{settings.storeName}</Text>
                         <View style={tw`flex-row items-center gap-2`}>
                             <Text style={tw`font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase ${appNameSize}`}>{appName}</Text>
                             <NetworkStatus />
@@ -50,33 +50,33 @@ export function HeaderModern() {
                     </View>
                 </View>
 
-                <View style={tw`flex-row items-center gap-2`}>
+                <View style={[tw`flex-row items-center`, { gap: width > 800 ? 8 : 4 }]}>
                     <Link href="/customers" asChild>
                         <TouchableOpacity
-                            style={tw`p-2.5 rounded-full bg-slate-50 active:bg-slate-100`}
+                            style={tw`p-2 rounded-full bg-slate-50 active:bg-slate-100`}
                         >
-                            <Users size={22} color="#475569" />
+                            <Users size={width > 800 ? 22 : 20} color="#475569" />
                         </TouchableOpacity>
                     </Link>
                     <Link href="/tables" asChild>
                         <TouchableOpacity
-                            style={tw`p-2.5 rounded-full bg-slate-50 active:bg-slate-100`}
+                            style={tw`p-2 rounded-full bg-slate-50 active:bg-slate-100`}
                         >
-                            <Square size={22} color="#475569" />
+                            <Square size={width > 800 ? 22 : 20} color="#475569" />
                         </TouchableOpacity>
                     </Link>
                     <Link href="/products" asChild>
                         <TouchableOpacity
-                            style={tw`p-2.5 rounded-full bg-slate-50 active:bg-slate-100`}
+                            style={tw`p-2 rounded-full bg-slate-50 active:bg-slate-100`}
                         >
-                            <Plus size={22} color="#475569" />
+                            <Plus size={width > 800 ? 22 : 20} color="#475569" />
                         </TouchableOpacity>
                     </Link>
                     <Link href="/profile" asChild>
                         <TouchableOpacity
-                            style={tw`p-2.5 rounded-full bg-slate-50 active:bg-slate-100 ml-1`}
+                            style={tw`p-2 rounded-full bg-slate-50 active:bg-slate-100 ml-1`}
                         >
-                            <Settings size={22} color="#1e293b" />
+                            <Settings size={width > 800 ? 22 : 20} color="#1e293b" />
                         </TouchableOpacity>
                     </Link>
                 </View>

@@ -18,13 +18,13 @@ export function CartPanel() {
 
     if (items.length === 0) {
         return (
-            <View style={[tw`flex-1 bg-white items-center justify-center p-4 border-l border-gray-200`, { paddingTop: insets.top }]}>
-                <View style={tw`bg-gray-100 p-6 rounded-full mb-4`}>
-                    <ShoppingBag size={48} color="#9ca3af" />
+            <View style={[tw`flex-1 bg-white items-center justify-center p-6 border-l border-gray-200`, { paddingTop: insets.top }]}>
+                <View style={tw`bg-slate-50 p-6 rounded-full mb-6 border border-slate-100`}>
+                    <ShoppingBag size={42} color="#94a3b8" />
                 </View>
-                <Text style={tw`text-xl font-bold text-gray-900 mb-2`}>Keranjang Kosong</Text>
-                <Text style={tw`text-gray-500 text-center mb-6`}>
-                    Pilih produk di sebelah kiri.
+                <Text style={tw`text-lg font-bold text-slate-800 mb-2`}>Keranjang Kosong</Text>
+                <Text style={tw`text-slate-500 text-center text-sm leading-5`}>
+                    Silakan pilih produk untuk memulai transaksi.
                 </Text>
             </View>
         );

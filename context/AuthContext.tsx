@@ -128,7 +128,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const signIn = async (email: string, password: string) => {
+    const signIn = async (identifier: string, password: string) => {
+        let email = identifier;
+
+        // If identifier doesn't look like an email, try to find it in profiles
+        if (!identifier.includes('@')) {
+            console.log('[AuthContext] Identifier is not an email, searching profiles for:', identifier);
+            
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('email')
+                .or(`username.eq."${identifier}",full_name.eq."${identifier}"`)
+                .maybeSingle();
+
+            if (data && data.email) {
+                console.log('[AuthContext] Found email for identifier:', data.email);
+                email = data.email;
+            } else if (error) {
+                console.error('[AuthContext] Error searching profile:', error);
+            } else {
+                console.warn('[AuthContext] No profile found for identifier:', identifier);
+            }
+        }
+
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         return { error };
     };
