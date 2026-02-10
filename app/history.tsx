@@ -18,7 +18,7 @@ export default function HistoryScreen() {
     const insets = useSafeAreaInsets();
     const { printReceipt } = usePrinter();
     const { role } = useAuth();
-    const { queue } = useOffline(); // Get offline queue
+    const { queue, syncNow, isSyncing } = useOffline(); // Get offline queue and sync tools
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -90,8 +90,14 @@ export default function HistoryScreen() {
     };
 
     const fetchTransactions = async () => {
+        let timeoutId: any;
         try {
             setLoading(true);
+
+            // Add 10-second timeout to the fetch
+            const controller = new AbortController();
+            timeoutId = setTimeout(() => controller.abort(), 10000);
+
             const branchId = await AsyncStorage.getItem('selected_branch_id');
 
             let query = supabase
@@ -107,7 +113,8 @@ export default function HistoryScreen() {
                         product:products(id, name, image_url)
                     )
                 `)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .abortSignal(controller.signal);
 
             // Apply Branch Filter
             if (branchId) {
@@ -133,10 +140,11 @@ export default function HistoryScreen() {
             }
 
             const { data, error } = await query;
+            clearTimeout(timeoutId);
+
             if (error) throw error;
 
             // Map data to handle renamed fields if necessary
-            // Transaction type expects 'items' but we fetched 'transaction_items'
             const mappedData = (data || []).map((t: any) => ({
                 ...t,
                 items: t.transaction_items || []
@@ -144,8 +152,14 @@ export default function HistoryScreen() {
 
             setTransactions(mappedData);
         } catch (error: any) {
+            if (timeoutId) clearTimeout(timeoutId);
             console.error('Error fetching transactions:', error);
-            Alert.alert('Error', 'Gagal memuat data transaksi');
+            // If it's an abort error, it means timeout or manual cancel
+            if (error.name === 'AbortError') {
+                console.log('Transaction fetch timed out/aborted.');
+            } else {
+                Alert.alert('Error', 'Gagal memuat data transaksi');
+            }
         } finally {
             setLoading(false);
         }
@@ -312,6 +326,30 @@ export default function HistoryScreen() {
                     )}
                     <TouchableOpacity onPress={() => { setDateFilter('all'); setSelectedUser(null); }}>
                         <Text style={tw`text-xs text-red-500 underline ml-1`}>Reset</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Offline Queue Sync Indicator */}
+            {queue.length > 0 && (
+                <View style={tw`mx-4 mt-3 bg-orange-50 border border-orange-100 rounded-xl p-3 flex-row items-center justify-between`}>
+                    <View style={tw`flex-row items-center gap-2`}>
+                        <RefreshCw size={18} color="#c2410c" style={isSyncing ? tw`opacity-50` : {}} />
+                        <View>
+                            <Text style={tw`text-orange-900 font-bold text-sm`}>{queue.length} Transaksi Belum Terkirim</Text>
+                            <Text style={tw`text-orange-700 text-xs`}>Data tersimpan di HP ini</Text>
+                        </View>
+                    </View>
+                    <TouchableOpacity
+                        onPress={() => syncNow()}
+                        disabled={isSyncing}
+                        style={tw`bg-orange-600 px-3 py-1.5 rounded-lg`}
+                    >
+                        {isSyncing ? (
+                            <ActivityIndicator size="small" color="white" />
+                        ) : (
+                            <Text style={tw`text-white font-bold text-xs`}>Sync Sekarang</Text>
+                        )}
                     </TouchableOpacity>
                 </View>
             )}

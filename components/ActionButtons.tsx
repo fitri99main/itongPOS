@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, TextInput, Alert, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, TextInput, Alert, StyleSheet, ScrollView, FlatList } from 'react-native';
 import { useCart } from '../context/CartContext';
-import { Calculator, PauseCircle, Percent, SplitSquareHorizontal, X, ArrowRightCircle } from 'lucide-react-native';
+import { Calculator, PauseCircle, Percent, SplitSquareHorizontal, X, ArrowRightCircle, Archive, Trash2, PlayCircle } from 'lucide-react-native';
 import tw from 'twrnc';
+import { Ticket } from 'lucide-react-native';
 
 export function ActionButtons() {
-    const { addCustomItem, holdOrder, setDiscount, discount, total } = useCart();
+    const { addCustomItem, holdOrder, setDiscount, discount, total, heldOrders, resumeHeldOrder, removeHeldOrder } = useCart();
 
     // Modals state
     const [showManual, setShowManual] = useState(false);
     const [showDiscount, setShowDiscount] = useState(false);
+    const [showRecall, setShowRecall] = useState(false);
 
     // Form state
     const [customName, setCustomName] = useState('');
@@ -66,19 +68,40 @@ export function ActionButtons() {
     };
 
     const handleHold = () => {
+        if (total <= 0) {
+            Alert.alert("Eror", "Keranjang kosong");
+            return;
+        }
+
         Alert.alert(
             "Hold Order?",
             "Order saat ini akan disimpan dan keranjang dikosongkan.",
             [
                 { text: "Batal", style: "cancel" },
                 {
-                    text: "Hold", onPress: () => {
-                        holdOrder();
-                        Alert.alert("Tersimpan", "Order berhasil disimpan!");
+                    text: "Hold", onPress: async () => {
+                        await holdOrder();
+                        Alert.alert("Tersimpan", "Order berhasil disimpan! Tekan tombol Recall untuk membuka kembali.");
                     }
                 }
             ]
         );
+    };
+
+    const handleResume = async (id: string) => {
+        await resumeHeldOrder(id);
+        setShowRecall(false);
+    };
+
+    const handleRemoveHeld = async (id: string) => {
+        Alert.alert("Hapus Hold", "Yakin hapus order ini?", [
+            { text: "Batal", style: 'cancel' },
+            {
+                text: "Hapus",
+                style: 'destructive',
+                onPress: async () => await removeHeldOrder(id)
+            }
+        ]);
     };
 
     return (
@@ -101,6 +124,14 @@ export function ActionButtons() {
                     label="Hold"
                     onPress={handleHold}
                     color="bg-yellow-50"
+                />
+
+                {/* Recall Order */}
+                <ActionButton
+                    icon={<Archive size={20} color="#d97706" />}
+                    label={`Recall (${heldOrders.length})`}
+                    onPress={() => setShowRecall(true)}
+                    color="bg-orange-50"
                 />
 
                 {/* Discount */}
@@ -129,6 +160,69 @@ export function ActionButtons() {
             </ScrollView>
 
             {/* --- MODALS --- */}
+
+            {/* Held Orders Modal (Recall) */}
+            <Modal visible={showRecall} transparent animationType="slide">
+                <View style={tw`flex-1 bg-black/50 justify-end`}>
+                    <View style={tw`bg-white w-full rounded-t-3xl p-5 h-[70%]`}>
+                        <View style={tw`flex-row justify-between items-center mb-4 pb-2 border-b border-gray-100`}>
+                            <View style={tw`flex-row items-center gap-2`}>
+                                <Archive size={24} color="#d97706" />
+                                <Text style={tw`text-xl font-bold text-gray-900`}>Order Disimpan</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowRecall(false)} style={tw`bg-gray-100 p-2 rounded-full`}>
+                                <X size={24} color="gray" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {heldOrders.length === 0 ? (
+                            <View style={tw`flex-1 items-center justify-center`}>
+                                <Archive size={48} color="#e5e7eb" />
+                                <Text style={tw`text-gray-400 mt-4`}>Tidak ada order yang disimpan</Text>
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={heldOrders}
+                                keyExtractor={item => item.id}
+                                contentContainerStyle={tw`pb-10`}
+                                renderItem={({ item }) => (
+                                    <View style={tw`bg-white border border-gray-200 rounded-xl p-4 mb-3 shadow-sm flex-row justify-between items-center`}>
+                                        <View style={tw`flex-1`}>
+                                            <View style={tw`flex-row items-center gap-2 mb-1`}>
+                                                <Text style={tw`bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded`}>
+                                                    {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </Text>
+                                                {item.table ? (
+                                                    <Text style={tw`text-xs font-bold text-gray-600`}>Meja {item.table}</Text>
+                                                ) : <Text style={tw`text-xs font-bold text-gray-500`}>Tanpa Meja</Text>}
+                                            </View>
+                                            <Text style={tw`font-bold text-lg`}>Rp {item.total.toLocaleString('id-ID')}</Text>
+                                            <Text style={tw`text-gray-500 text-xs`}>{item.items.length} item • {item.customer?.name || 'Umum'}</Text>
+                                        </View>
+
+                                        <View style={tw`flex-row gap-2`}>
+                                            <TouchableOpacity
+                                                onPress={() => handleRemoveHeld(item.id)}
+                                                style={tw`p-3 bg-red-50 rounded-lg border border-red-100`}
+                                            >
+                                                <Trash2 size={20} color="#dc2626" />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                onPress={() => handleResume(item.id)}
+                                                style={tw`p-3 bg-blue-600 rounded-lg flex-row items-center gap-2 shadow-sm`}
+                                            >
+                                                <PlayCircle size={20} color="white" />
+                                                <Text style={tw`text-white font-bold`}>Buka</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                )}
+                            />
+                        )}
+                    </View>
+                </View>
+            </Modal>
+
 
             {/* Manual Item Modal */}
             <Modal visible={showManual} transparent animationType="fade">

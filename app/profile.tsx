@@ -19,6 +19,7 @@ import {
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfirmationModal } from '../components/ConfirmationModal';
+import { useOffline } from '../context/OfflineContext';
 import tw from 'twrnc';
 
 interface BestSeller {
@@ -32,6 +33,7 @@ interface BestSeller {
 export default function Profile() {
     const router = useRouter();
     const { signOut, user, role, permissions } = useAuth();
+    const { isOnline } = useOffline();
     const insets = useSafeAreaInsets();
     const [loading, setLoading] = useState(true);
     const [todayStats, setTodayStats] = useState({ total: 0, count: 0 });
@@ -244,9 +246,17 @@ export default function Profile() {
                 <View>
                     <Text style={tw`text-2xl font-bold text-gray-900`}>Pengaturan</Text>
                     <View style={tw`flex-row items-center gap-2 mt-1`}>
-                        <View style={[tw`w-2 h-2 rounded-full`, role === 'admin' ? tw`bg-blue-500` : role === 'cashier' ? tw`bg-green-500` : tw`bg-gray-300`]} />
-                        <Text style={tw`text-gray-500 capitalize`}>
-                            {role === 'admin' ? 'Administrator' : role === 'cashier' ? 'Kasir' : 'Memuat...'} - {user?.email}
+                        <View style={[
+                            tw`w-2.5 h-2.5 rounded-full`,
+                            !isOnline ? tw`bg-red-500 shadow-sm shadow-red-200` :
+                                role === 'admin' ? tw`bg-blue-500` :
+                                    role === 'cashier' ? tw`bg-green-500` : tw`bg-gray-300`
+                        ]} />
+                        <Text style={[
+                            tw`text-sm font-bold`,
+                            !isOnline ? tw`text-red-600` : tw`text-gray-500`
+                        ]}>
+                            {!isOnline ? 'OFFLINE' : (role === 'admin' ? 'ADMINISTRATOR' : role === 'cashier' ? 'KASIR' : 'MEMUAT...')}
                         </Text>
                     </View>
                 </View>

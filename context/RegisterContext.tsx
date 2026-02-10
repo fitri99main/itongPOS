@@ -43,6 +43,16 @@ export function RegisterProvider({ children }: { children: ReactNode }) {
         }
     }, [user]);
 
+    // Safety timeout for Register Loading
+    useEffect(() => {
+        if (!loading) return;
+        const timeoutId = setTimeout(() => {
+            console.warn('[RegisterContext] ⚠️ LOADING TIMEOUT (5s)! Forcing loading = false.');
+            setLoading(false);
+        }, 5000);
+        return () => clearTimeout(timeoutId);
+    }, [loading]);
+
     const checkActiveRegister = async () => {
         try {
             setLoading(true);

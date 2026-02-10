@@ -88,7 +88,40 @@ export default function ReportsScreen() {
                 throw transError;
             }
 
-            // Fetch Purchases
+            // Calculate Sales and Returns
+            const totalSales = transactionsData
+                ?.filter(t => t.status === 'completed')
+                .reduce((sum, item) => sum + item.total_amount, 0) || 0;
+
+            const totalReturns = transactionsData
+                ?.filter(t => t.status === 'returned')
+                .reduce((sum, item) => sum + item.total_amount, 0) || 0;
+
+            // Fetch COGS (Cost of Goods Sold) from transaction_items
+            // Join with transactions to filter by date and status
+            let cogsQuery = supabase
+                .from('transaction_items')
+                .select('cost_price, quantity, transactions!inner(created_at, status)')
+                .eq('transactions.status', 'completed');
+
+            if (filterPeriod !== 'all') {
+                cogsQuery = cogsQuery.gte('transactions.created_at', isoDate);
+            }
+
+            const { data: itemsData, error: itemsError } = await cogsQuery;
+
+            let totalCOGS = 0;
+            if (!itemsError && itemsData) {
+                totalCOGS = itemsData.reduce((sum, item) => {
+                    const costPrice = item.cost_price || 0;
+                    return sum + (costPrice * item.quantity);
+                }, 0);
+            } else if (itemsError) {
+                console.error('COGS fetch error:', itemsError);
+                // Continue with COGS = 0 if query fails (e.g., column doesn't exist yet)
+            }
+
+            // Fetch Purchases (for reference, not used in profit calculation anymore)
             let purchasesQuery = supabase
                 .from('purchases')
                 .select('total_amount, created_at');
@@ -108,20 +141,11 @@ export default function ReportsScreen() {
                 console.log('Purchase fetch exception', err);
             }
 
-            // Calculate Totals
-            const totalSales = transactionsData
-                ?.filter(t => t.status === 'completed')
-                .reduce((sum, item) => sum + item.total_amount, 0) || 0;
-
-            const totalReturns = transactionsData
-                ?.filter(t => t.status === 'returned')
-                .reduce((sum, item) => sum + item.total_amount, 0) || 0;
-
             setSummary({
                 sales: totalSales,
-                purchases: totalPurchases,
+                purchases: totalPurchases, // Keep for reference
                 returns: totalReturns,
-                profit: totalSales - totalPurchases, // Net Profit = Sales (already excludes returns) - Purchases
+                profit: totalSales - totalCOGS, // Gross Profit = Sales - COGS
                 transactionCount: transactionsData?.length || 0
             });
 
@@ -162,13 +186,13 @@ export default function ReportsScreen() {
 
                     {/* Net Profit Card */}
                     <View style={tw`bg-blue-600 rounded-2xl p-6 shadow-lg mb-6`}>
-                        <Text style={tw`text-blue-100 font-medium mb-1`}>Keuntungan Bersih (Net Profit)</Text>
+                        <Text style={tw`text-blue-100 font-medium mb-1`}>Keuntungan Bersih (Gross Profit)</Text>
                         <Text style={tw`text-4xl font-bold text-white`}>
                             Rp {summary.profit.toLocaleString('id-ID')}
                         </Text>
                         <View style={tw`mt-4 flex-row items-center gap-2 bg-blue-700/40 self-start px-3 py-1 rounded-lg`}>
                             <TrendingUp size={16} color="#4ade80" />
-                            <Text style={tw`text-green-300 font-medium`}>Total Penjualan - Pembelian</Text>
+                            <Text style={tw`text-green-300 font-medium`}>Total Penjualan - HPP</Text>
                         </View>
                     </View>
 

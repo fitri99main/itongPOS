@@ -8,6 +8,7 @@ import { CartProvider } from '../context/CartContext';
 import { OfflineProvider } from '../context/OfflineContext';
 import { PrinterProvider } from '../context/PrinterContext';
 import { RegisterProvider } from '../context/RegisterContext';
+import { StoreProvider } from '../context/StoreContext';
 
 const queryClient = new QueryClient();
 
@@ -57,8 +58,6 @@ function RootLayoutNav() {
 
 import { useKeepAwake } from 'expo-keep-awake';
 
-// ...
-
 export default function Layout() {
     useKeepAwake();
 
@@ -68,9 +67,11 @@ export default function Layout() {
                 <AuthProvider>
                     <RegisterProvider>
                         <PrinterProvider>
-                            <CartProvider>
-                                <RootLayoutNav />
-                            </CartProvider>
+                            <StoreProvider>
+                                <CartProvider>
+                                    <RootLayoutNav />
+                                </CartProvider>
+                            </StoreProvider>
                         </PrinterProvider>
                     </RegisterProvider>
                 </AuthProvider>

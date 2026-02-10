@@ -5,45 +5,83 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ArrowLeft, Store, Printer, Save, MapPin, Phone, FileText, CreditCard, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
+import { supabase } from '../lib/supabase';
 
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { ReceiptPreview } from '../components/ReceiptPreview';
 import { useOffline } from '../context/OfflineContext';
 
+import { useStore } from '../context/StoreContext';
+
 export default function StoreScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const [loading, setLoading] = useState(true);
+    const { settings, updateSettings, loading: storeLoading } = useStore();
+
+    const [loading, setLoading] = useState(false); // Using storeLoading instead mostly
     const [showPreviewModal, setShowPreviewModal] = useState(false);
     const [saving, setSaving] = useState(false);
     const { isManualOffline, setManualOffline } = useOffline();
 
-    // Store Identity
-    const [storeName, setStoreName] = useState('');
-    const [storeAddress, setStoreAddress] = useState('');
-    const [storePhone, setStorePhone] = useState('');
-    const [openTime, setOpenTime] = useState('');
-    const [closeTime, setCloseTime] = useState('');
-    const [footerMessage, setFooterMessage] = useState('');
+    // Local form state - initialized from context
+    const [storeName, setStoreName] = useState(settings.storeName);
+    const [storeAddress, setStoreAddress] = useState(settings.storeAddress);
+    const [storePhone, setStorePhone] = useState(settings.storePhone);
+    const [openTime, setOpenTime] = useState(settings.openTime);
+    const [closeTime, setCloseTime] = useState(settings.closeTime);
+    const [footerMessage, setFooterMessage] = useState(settings.footerMessage);
 
     // Printer Settings
-    const [autoPrint, setAutoPrint] = useState(false);
-    const [paperSize, setPaperSize] = useState('58mm'); // 58mm or 80mm
+    const [autoPrint, setAutoPrint] = useState(settings.autoPrint);
+    const [paperSize, setPaperSize] = useState(settings.paperSize);
 
     // Payment Methods
-    const [enableQris, setEnableQris] = useState(true);
-    const [enableTransfer, setEnableTransfer] = useState(true);
-    const [enableDebit, setEnableDebit] = useState(true);
-    const [enableCredit, setEnableCredit] = useState(true);
+    const [enableQris, setEnableQris] = useState(settings.enableQris);
+    const [enableTransfer, setEnableTransfer] = useState(settings.enableTransfer);
+    const [enableDebit, setEnableDebit] = useState(settings.enableDebit);
+    const [enableCredit, setEnableCredit] = useState(settings.enableCredit);
 
     // Receipt Content Settings
-    const [showTableNumber, setShowTableNumber] = useState(true);
-    const [showCustomerName, setShowCustomerName] = useState(true);
-    const [showCashierName, setShowCashierName] = useState(true);
-    const [showServerName, setShowServerName] = useState(true);
-    const [showOrderDate, setShowOrderDate] = useState(true);
-    const [showDiscount, setShowDiscount] = useState(true);
-    const [showPreviewBeforePay, setShowPreviewBeforePay] = useState(false);
+    const [showTableNumber, setShowTableNumber] = useState(settings.showTableNumber);
+    const [showCustomerName, setShowCustomerName] = useState(settings.showCustomerName);
+    const [showCashierName, setShowCashierName] = useState(settings.showCashierName);
+    const [showServerName, setShowServerName] = useState(settings.showServerName);
+    const [showOrderDate, setShowOrderDate] = useState(settings.showOrderDate);
+    const [showDiscount, setShowDiscount] = useState(settings.showDiscount);
+    const [showPreviewBeforePay, setShowPreviewBeforePay] = useState(settings.showPreviewBeforePay);
+
+    // UI Toggles
+    const [showTable, setShowTable] = useState(settings.showTable);
+    const [showRecall, setShowRecall] = useState(settings.showRecall);
+    const [showGuest, setShowGuest] = useState(settings.showGuest);
+    const [showManual, setShowManual] = useState(settings.showManual);
+
+    // Update local state when remote settings change (realtime)
+    useEffect(() => {
+        setStoreName(settings.storeName);
+        setStoreAddress(settings.storeAddress);
+        setStorePhone(settings.storePhone);
+        setOpenTime(settings.openTime);
+        setCloseTime(settings.closeTime);
+        setFooterMessage(settings.footerMessage);
+        setAutoPrint(settings.autoPrint);
+        setPaperSize(settings.paperSize);
+        setEnableQris(settings.enableQris);
+        setEnableTransfer(settings.enableTransfer);
+        setEnableDebit(settings.enableDebit);
+        setEnableCredit(settings.enableCredit);
+        setShowTableNumber(settings.showTableNumber);
+        setShowCustomerName(settings.showCustomerName);
+        setShowCashierName(settings.showCashierName);
+        setShowServerName(settings.showServerName);
+        setShowOrderDate(settings.showOrderDate);
+        setShowDiscount(settings.showDiscount);
+        setShowPreviewBeforePay(settings.showPreviewBeforePay);
+        setShowTable(settings.showTable);
+        setShowRecall(settings.showRecall);
+        setShowGuest(settings.showGuest);
+        setShowManual(settings.showManual);
+    }, [settings]);
 
     // Notification Modal State
     const [showStatusModal, setShowStatusModal] = useState(false);
@@ -56,64 +94,12 @@ export default function StoreScreen() {
 
     // ...
 
-    useEffect(() => {
-        console.log('StoreScreen: Loading settings...');
-        const timer = setTimeout(() => {
-            if (loading) {
-                console.warn('StoreScreen: Loading timed out');
-                setLoading(false);
-                Alert.alert('Warning', 'Gagal memuat pengaturan (Timeout).');
-            }
-        }, 8000);
-
-        loadSettings().then(() => clearTimeout(timer));
-
-        return () => clearTimeout(timer);
-    }, []);
-
-    const loadSettings = async () => {
-        try {
-            const settings = await AsyncStorage.getItem('store_settings');
-            if (settings) {
-                const parsed = JSON.parse(settings);
-                setStoreName(parsed.storeName || '');
-                setStoreAddress(parsed.storeAddress || '');
-                setStorePhone(parsed.storePhone || '');
-                setOpenTime(parsed.openTime || '08:00');
-                setCloseTime(parsed.closeTime || '22:00');
-                setFooterMessage(parsed.footerMessage || '');
-                setPaperSize(parsed.paperSize || '58mm');
-                setAutoPrint(parsed.autoPrint || false);
-
-                // Payment Methods
-                setEnableQris(parsed.enableQris !== false);
-                setEnableTransfer(parsed.enableTransfer !== false);
-                setEnableDebit(parsed.enableDebit !== false);
-                setEnableCredit(parsed.enableCredit !== false);
-
-                // Receipt Content
-                setShowTableNumber(parsed.showTableNumber !== false);
-                setShowCustomerName(parsed.showCustomerName !== false);
-                setShowCashierName(parsed.showCashierName !== false);
-                setShowServerName(parsed.showServerName !== false);
-                setShowOrderDate(parsed.showOrderDate !== false);
-                setShowDiscount(parsed.showDiscount !== false);
-                setShowPreviewBeforePay(parsed.showPreviewBeforePay || false);
-            } else {
-                setStoreName('Toko Saya');
-                setFooterMessage('Terima Kasih atas Kunjungan Anda');
-            }
-        } catch (error) {
-            console.error('Failed to load settings', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // Unified save function using StoreContext
     const handleSave = async () => {
         setSaving(true);
         try {
-            const settings = {
+            console.log('Saving store settings via context...');
+            const success = await updateSettings({
                 storeName,
                 storeAddress,
                 storePhone,
@@ -132,9 +118,15 @@ export default function StoreScreen() {
                 showServerName,
                 showOrderDate,
                 showDiscount,
-                showPreviewBeforePay
-            };
-            await AsyncStorage.setItem('store_settings', JSON.stringify(settings));
+                showPreviewBeforePay,
+                showTable,
+                showRecall,
+                showGuest,
+                showManual
+            });
+
+            if (!success) throw new Error('Gagal sync ke database');
+
             setStatusModalConfig({
                 title: 'Sukses',
                 message: 'Pengaturan toko berhasil disimpan',
@@ -145,10 +137,11 @@ export default function StoreScreen() {
                 }
             });
             setShowStatusModal(true);
-        } catch (error) {
+        } catch (error: any) {
+            console.error('Save error:', error);
             setStatusModalConfig({
                 title: 'Eror',
-                message: 'Gagal menyimpan pengaturan',
+                message: `Gagal menyimpan pengaturan: ${error.message || 'Unknown error'}`,
                 type: 'danger',
                 onConfirm: () => setShowStatusModal(false)
             });
@@ -308,6 +301,28 @@ export default function StoreScreen() {
                             style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                         />
                     </View>
+                </View>
+
+                {/* Tampilan Menu Kasir */}
+                <View style={tw`bg-white p-3 rounded-xl border border-gray-200 shadow-sm mb-3`}>
+                    <Text style={tw`text-gray-900 font-bold mb-2 text-sm`}>Tampilan Menu Kasir</Text>
+                    {[
+                        { label: 'Pilih Meja', value: showTable, setter: setShowTable },
+                        { label: 'Recall / Arsip', value: showRecall, setter: setShowRecall },
+                        { label: 'Pilih Pelanggan', value: showGuest, setter: setShowGuest },
+                        { label: 'Input Manual', value: showManual, setter: setShowManual },
+                    ].map((item, index) => (
+                        <View key={index} style={tw`flex-row items-center justify-between py-1.5 border-b border-gray-50 last:border-0`}>
+                            <Text style={tw`text-gray-600 text-xs flex-1`}>{item.label}</Text>
+                            <Switch
+                                value={item.value}
+                                onValueChange={item.setter}
+                                trackColor={{ false: '#e5e7eb', true: '#BFDBFE' }}
+                                thumbColor={item.value ? '#2563eb' : '#f3f4f6'}
+                                style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                            />
+                        </View>
+                    ))}
                 </View>
 
                 <View style={tw`flex-row gap-3`}>

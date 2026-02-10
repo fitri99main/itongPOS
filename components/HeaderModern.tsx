@@ -1,40 +1,27 @@
 import { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { Settings, Plus, Users, Square } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Link, useFocusEffect } from 'expo-router';
 import tw from 'twrnc';
 import { NetworkStatus } from './NetworkStatus';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useOffline } from '../context/OfflineContext';
+import { useStore } from '../context/StoreContext';
 
 export function HeaderModern() {
     const { user, role } = useAuth();
+    const { isOnline } = useOffline();
     const insets = useSafeAreaInsets();
+    const { settings } = useStore();
+    const { width } = useWindowDimensions();
 
-    // Default values as requested
-    const [storeName, setStoreName] = useState('WUDKopi');
-    const [appName, setAppName] = useState('KASIR KAFE');
+    // Responsive scaling
+    const storeNameSize = width > 600 ? 'text-3xl' : 'text-2xl';
+    const appNameSize = width > 600 ? 'text-sm' : 'text-xs';
 
-    useFocusEffect(
-        useCallback(() => {
-            loadSettings();
-        }, [])
-    );
-
-    const loadSettings = async () => {
-        try {
-            const settings = await AsyncStorage.getItem('store_settings');
-            if (settings) {
-                const parsed = JSON.parse(settings);
-                if (parsed.storeName) setStoreName(parsed.storeName);
-                // App Name is not in settings currently, keeping it static or could be added later.
-                // For now, user requested "kasir kafe sebagai nama aplikasi" which matches the default.
-            }
-        } catch (error) {
-            console.error('Failed to load header settings', error);
-        }
-    };
+    // App Name is static as per request
+    const appName = 'KASIR KAFE';
 
     return (
         <View style={{ paddingTop: insets.top, backgroundColor: 'white' }}>
@@ -42,14 +29,24 @@ export function HeaderModern() {
                 {/* Removed border-b, added more padding for specious feel */}
                 <View style={tw`flex-row items-center gap-3`}>
                     <View>
-                        <Text style={tw`font-extrabold text-2xl text-slate-800 tracking-tight`}>{storeName}</Text>
+                        <Text style={tw`font-extrabold ${storeNameSize} text-slate-800 tracking-tight`}>{settings.storeName}</Text>
                         <View style={tw`flex-row items-center gap-2`}>
-                            <Text style={tw`text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase`}>{appName}</Text>
+                            <Text style={tw`font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase ${appNameSize}`}>{appName}</Text>
                             <NetworkStatus />
                         </View>
-                        <Text style={tw`text-[9px] text-gray-400 mt-0.5 italic`}>
-                            {role === 'admin' ? 'Admin' : 'Kasir'}: {user?.email?.split('@')[0]}
-                        </Text>
+                        <View style={tw`flex-row items-center gap-1.5 mt-0.5`}>
+                            <View style={[
+                                tw`w-2.5 h-2.5 rounded-full`,
+                                !isOnline ? tw`bg-red-500` :
+                                    role === 'admin' ? tw`bg-blue-400` : tw`bg-green-400`
+                            ]} />
+                            <Text style={[
+                                tw`text-[10px] font-bold`,
+                                !isOnline ? tw`text-red-600` : tw`text-gray-400`
+                            ]}>
+                                {!isOnline ? 'DISCONNECTED' : (role === 'admin' ? 'ADMIN' : 'KASIR')}
+                            </Text>
+                        </View>
                     </View>
                 </View>
 

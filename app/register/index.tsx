@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } fr
 import { useRouter } from 'expo-router';
 import { useRegister } from '../../context/RegisterContext';
 import { useAuth } from '../../context/AuthContext';
+import { useOffline } from '../../context/OfflineContext';
 import { supabase } from '../../lib/supabase';
 import {
     Store,
@@ -22,6 +23,7 @@ export default function RegisterIndex() {
     const insets = useSafeAreaInsets();
     const { activeRegister, loading: registerLoading, refreshStatus } = useRegister();
     const { user } = useAuth();
+    const { isOnline } = useOffline();
     const [history, setHistory] = useState<any[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
 
@@ -76,6 +78,11 @@ export default function RegisterIndex() {
                                 <Text style={tw`text-2xl font-bold text-gray-900`}>
                                     {activeRegister ? 'Kasir Terbuka' : 'Kasir Tertutup'}
                                 </Text>
+                                {!isOnline && (
+                                    <View style={tw`bg-red-100 px-2 py-0.5 rounded-lg ml-2`}>
+                                        <Text style={tw`text-red-600 text-[10px] font-bold`}>OFFLINE</Text>
+                                    </View>
+                                )}
                             </View>
                         </View>
                         <View style={tw`bg-blue-50 p-3 rounded-2xl`}>

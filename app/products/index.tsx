@@ -27,6 +27,7 @@ export default function ProductsScreen() {
     const [formData, setFormData] = useState({
         name: '',
         price: '',
+        cost_price: '',
         stock: '',
         category_id: '',
         description: '',
@@ -150,6 +151,7 @@ export default function ProductsScreen() {
         const payload = {
             name: formData.name,
             price: parseFloat(formData.price),
+            cost_price: formData.cost_price ? parseFloat(formData.cost_price) : 0,
             stock: parseInt(formData.stock) || 0,
             description: formData.description,
             image_url: imageUrl || (editingProduct?.image_url || null),
@@ -231,6 +233,7 @@ export default function ProductsScreen() {
             setFormData({
                 name: product.name,
                 price: product.price.toString(),
+                cost_price: (product as any).cost_price?.toString() || '0',
                 stock: product.stock.toString(),
                 category_id: product.category_id,
                 description: product.description || '',
@@ -244,7 +247,7 @@ export default function ProductsScreen() {
 
     const resetForm = () => {
         setEditingProduct(null);
-        setFormData({ name: '', price: '', stock: '', category_id: '', description: '', image_url: '' });
+        setFormData({ name: '', price: '', cost_price: '', stock: '', category_id: '', description: '', image_url: '' });
     };
 
     const filteredProducts = products.filter(p =>
@@ -380,7 +383,7 @@ export default function ProductsScreen() {
 
                         <View style={tw`flex-row gap-4 mb-4`}>
                             <View style={tw`flex-1`}>
-                                <Text style={tw`text-gray-700 font-medium mb-1`}>Harga</Text>
+                                <Text style={tw`text-gray-700 font-medium mb-1`}>Harga Jual</Text>
                                 <TextInput
                                     style={tw`bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900`}
                                     placeholder="0"
@@ -390,15 +393,26 @@ export default function ProductsScreen() {
                                 />
                             </View>
                             <View style={tw`flex-1`}>
-                                <Text style={tw`text-gray-700 font-medium mb-1`}>Stok</Text>
+                                <Text style={tw`text-gray-700 font-medium mb-1`}>Harga Modal</Text>
                                 <TextInput
                                     style={tw`bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900`}
                                     placeholder="0"
                                     keyboardType="numeric"
-                                    value={formData.stock}
-                                    onChangeText={(t) => setFormData({ ...formData, stock: t })}
+                                    value={formData.cost_price}
+                                    onChangeText={(t) => setFormData({ ...formData, cost_price: t })}
                                 />
                             </View>
+                        </View>
+
+                        <View style={tw`mb-4`}>
+                            <Text style={tw`text-gray-700 font-medium mb-1`}>Stok</Text>
+                            <TextInput
+                                style={tw`bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900`}
+                                placeholder="0"
+                                keyboardType="numeric"
+                                value={formData.stock}
+                                onChangeText={(t) => setFormData({ ...formData, stock: t })}
+                            />
                         </View>
 
                         <View style={tw`mb-4`}>
@@ -465,6 +479,6 @@ export default function ProductsScreen() {
                 onConfirm={statusModalConfig.onConfirm}
                 onCancel={() => setShowStatusModal(false)}
             />
-        </View>
+        </View >
     );
 }

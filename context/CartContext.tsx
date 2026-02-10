@@ -1,4 +1,4 @@
-import { useState, createContext, useContext, ReactNode } from 'react';
+import { useState, createContext, useContext, ReactNode, useEffect } from 'react';
 import { Product, CartItem, Customer } from '../types';
 import { supabase } from '../lib/supabase';
 import { useOffline } from './OfflineContext';
@@ -6,14 +6,29 @@ import { generateUUID } from '../lib/utils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRegister } from './RegisterContext';
 
+export interface HeldOrder {
+    id: string;
+    items: CartItem[];
+    customer: Customer | null;
+    table: string;
+    timestamp: number;
+    note?: string;
+    subtotal: number;
+    discount: number;
+    total: number;
+}
+
 interface CartContextType {
     items: CartItem[];
+    heldOrders: HeldOrder[];
     addItem: (product: Product) => void;
     addCustomItem: (name: string, price: number) => void;
     removeItem: (productId: string) => void;
     updateQuantity: (productId: string, quantity: number) => void;
     clearCart: () => void;
-    holdOrder: () => void;
+    holdOrder: (note?: string) => Promise<void>;
+    resumeHeldOrder: (orderId: string) => Promise<void>;
+    removeHeldOrder: (orderId: string) => Promise<void>;
     subtotal: number;
     discount: number;
     setDiscount: (amount: number) => void;
@@ -34,6 +49,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const [items, setItems] = useState<CartItem[]>([]);
     const [discount, setDiscount] = useState(0);
     const [customer, setCustomer] = useState<Customer | null>(null);
+
+    const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
+
+    useEffect(() => {
+        loadHeldOrders();
+    }, []);
+
+    const loadHeldOrders = async () => {
+        try {
+            const saved = await AsyncStorage.getItem('held_orders');
+            if (saved) setHeldOrders(JSON.parse(saved));
+        } catch (e) {
+            console.error('Failed to load held orders', e);
+        }
+    };
 
     const addItem = (product: Product) => {
         setItems(prev => {
@@ -85,9 +115,47 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setSelectedTable('');
     }
 
-    const holdOrder = () => {
-        // In a real app, save to Supabase "held_orders" table
+    const holdOrder = async (note?: string) => {
+        if (items.length === 0) return;
+
+        const newHeldOrder: HeldOrder = {
+            id: Date.now().toString(),
+            items: [...items],
+            customer,
+            table: selectedTable,
+            timestamp: Date.now(),
+            note,
+            subtotal,
+            discount,
+            total
+        };
+
+        const updatedHeldOrders = [...heldOrders, newHeldOrder];
+        setHeldOrders(updatedHeldOrders);
+        await AsyncStorage.setItem('held_orders', JSON.stringify(updatedHeldOrders));
         clearCart();
+    };
+
+    const resumeHeldOrder = async (orderId: string) => {
+        const orderToResume = heldOrders.find(o => o.id === orderId);
+        if (!orderToResume) return;
+
+        // Restore state
+        setItems(orderToResume.items);
+        setCustomer(orderToResume.customer);
+        setSelectedTable(orderToResume.table);
+        setDiscount(orderToResume.discount || 0);
+
+        // Remove from held list
+        const updatedHeldOrders = heldOrders.filter(o => o.id !== orderId);
+        setHeldOrders(updatedHeldOrders);
+        await AsyncStorage.setItem('held_orders', JSON.stringify(updatedHeldOrders));
+    };
+
+    const removeHeldOrder = async (orderId: string) => {
+        const updatedHeldOrders = heldOrders.filter(o => o.id !== orderId);
+        setHeldOrders(updatedHeldOrders);
+        await AsyncStorage.setItem('held_orders', JSON.stringify(updatedHeldOrders));
     };
 
     const subtotal = items.reduce(
@@ -148,12 +216,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
             };
 
             const transactionItemsPayload = items.map(item => {
-                const isCustomItem = item.product.id.startsWith('custom-');
+                const isCustomItem = !item.product.id || item.product.id === 'custom';
                 return {
                     product_id: isCustomItem ? null : item.product.id,
                     product_name: item.product.name, // Save snapshot of name
                     quantity: item.quantity,
-                    price: item.product.price
+                    price: item.product.price,
+                    cost_price: (item.product as any).cost_price || 0 // Track cost at time of sale
                 };
             });
 
@@ -278,12 +347,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
         <CartContext.Provider
             value={{
                 items,
+                heldOrders,
                 addItem,
                 addCustomItem,
                 removeItem,
                 updateQuantity,
                 clearCart,
                 holdOrder,
+                resumeHeldOrder,
+                removeHeldOrder,
                 subtotal,
                 discount,
                 setDiscount,

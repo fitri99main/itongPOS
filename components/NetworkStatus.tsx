@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, Platform } from 'react-native';
+import { View, Text, Animated, Platform } from 'react-native';
 import { useOffline } from '../context/OfflineContext';
 import { Wifi, WifiOff, RefreshCw, CheckCircle2 } from 'lucide-react-native';
 import tw from 'twrnc';
@@ -58,16 +58,17 @@ export function NetworkStatus() {
     return (
         <Animated.View
             style={[
-                tw`flex-row items-center justify-center p-1 rounded-full ${currentConfig.bg}`,
+                tw`flex-row items-center px-2 py-0.5 rounded-full ${currentConfig.bg}`,
                 {
                     opacity: fadeAnim,
-                    width: 24,
-                    height: 24,
-                    marginLeft: 8 // Add some spacing from the text
+                    marginLeft: 4
                 }
             ]}
         >
-            <Icon size={14} color={currentConfig.color} />
+            <Icon size={12} color={currentConfig.color} />
+            <Text style={tw`text-[10px] font-bold text-white ml-1 uppercase`}>
+                {status === 'offline' ? 'Offline' : status === 'syncing' ? 'Syncing' : 'Online'}
+            </Text>
         </Animated.View>
     );
 }

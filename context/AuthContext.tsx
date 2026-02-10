@@ -26,14 +26,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Safety Timeout for Global Loading (Prevent Splash Screen Freeze)
     useEffect(() => {
-        const timer = setTimeout(() => {
-            if (loading) {
-                console.warn('[AuthContext] Loading timed out. Forcing app entry.');
-                setLoading(false);
-            }
-        }, 5000); // 5 seconds max for splash screen
-        return () => clearTimeout(timer);
-    }, [loading]);
+        if (!loading) return;
+
+        const timeoutId = setTimeout(() => {
+            console.warn('[AuthContext] ⚠️ LOADING TIMEOUT (5s)! Forcing loading = false. This prevents app from being stuck on splash screen.');
+            setLoading(false);
+        }, 5000);
+
+        return () => clearTimeout(timeoutId);
+    }, [loading]); // Only reset if loading state actually flips
 
     useEffect(() => {
         // Load role from storage initially
