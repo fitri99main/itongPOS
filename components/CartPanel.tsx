@@ -130,7 +130,7 @@ export function CartPanel() {
 
                     <TouchableOpacity
                         onPress={handleCheckout}
-                        style={tw`bg-blue-600 py-3 rounded-xl items-center shadow-md active:bg-blue-700`}
+                        style={tw`bg-gray-900 py-3 rounded-xl items-center shadow-md active:bg-gray-800`}
                     >
                         <Text style={tw`text-white font-bold text-lg`}>Bayar Sekarang</Text>
                     </TouchableOpacity>

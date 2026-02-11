@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Switch, Alert, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Switch, ActivityIndicator, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ArrowLeft, Store, Printer, Save, MapPin, Phone, FileText, CreditCard, X } from 'lucide-react-native';
@@ -12,6 +12,7 @@ import { ReceiptPreview } from '../components/ReceiptPreview';
 import { useOffline } from '../context/OfflineContext';
 
 import { useStore } from '../context/StoreContext';
+import * as Speech from 'expo-speech';
 
 export default function StoreScreen() {
     const router = useRouter();
@@ -55,6 +56,8 @@ export default function StoreScreen() {
     const [showRecall, setShowRecall] = useState(settings.showRecall);
     const [showGuest, setShowGuest] = useState(settings.showGuest);
     const [showManual, setShowManual] = useState(settings.showManual);
+    const [enforceShift, setEnforceShift] = useState(settings.enforceShift);
+    const [enableGreeting, setEnableGreeting] = useState(settings.enableGreeting);
 
     // Update local state when remote settings change (realtime)
     useEffect(() => {
@@ -81,6 +84,8 @@ export default function StoreScreen() {
         setShowRecall(settings.showRecall);
         setShowGuest(settings.showGuest);
         setShowManual(settings.showManual);
+        setEnforceShift(settings.enforceShift);
+        setEnableGreeting(settings.enableGreeting);
     }, [settings]);
 
     // Notification Modal State
@@ -122,7 +127,9 @@ export default function StoreScreen() {
                 showTable,
                 showRecall,
                 showGuest,
-                showManual
+                showManual,
+                enforceShift,
+                enableGreeting
             });
 
             if (!success) throw new Error('Gagal sync ke database');
@@ -148,6 +155,69 @@ export default function StoreScreen() {
             setShowStatusModal(true);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const testGreeting = async () => {
+        console.log('[Store] Testing greeting...');
+        try {
+            // Correct method name from expo-speech
+            const voices = await Speech.getAvailableVoicesAsync();
+            const hasIndonesian = voices.some((v: any) => v.language.startsWith('id'));
+
+            console.log(`[Store] Voices found: ${voices.length}, Indonesian available: ${hasIndonesian}`);
+
+            Speech.speak('Assalamualaikum warahmatullahi wabarakatuh', {
+                language: 'id-ID',
+                pitch: 1.0,
+                rate: 0.9,
+                onStart: () => console.log('[Store] Speech started'),
+                onError: (error) => {
+                    console.error('[Store] Speech error:', error);
+                    setStatusModalConfig({
+                        title: 'Gagal Memutar',
+                        message: 'Kesalahan pada sistem suara: ' + (error as any).message,
+                        type: 'danger',
+                        onConfirm: () => setShowStatusModal(false)
+                    });
+                    setShowStatusModal(true);
+                }
+            });
+
+            if (voices.length === 0) {
+                setStatusModalConfig({
+                    title: 'Peringatan',
+                    message: 'Tidak ditemukan mesin suara (TTS) pada HP ini. Pastikan "Google Speech Services" aktif di pengaturan HP.',
+                    type: 'warning',
+                    onConfirm: () => setShowStatusModal(false)
+                });
+                setShowStatusModal(true);
+            } else if (!hasIndonesian) {
+                setStatusModalConfig({
+                    title: 'Info Suara',
+                    message: 'Bahasa Indonesia tidak terdeteksi. Mencoba memutar dengan suara default.',
+                    type: 'info',
+                    onConfirm: () => setShowStatusModal(false)
+                });
+                setShowStatusModal(true);
+            } else {
+                setStatusModalConfig({
+                    title: 'Proses Memutar',
+                    message: 'Suara sedang dikirim ke speaker. Jika tetap sunyi, pastikan VOLUME MEDIA HP Anda sudah aktif.',
+                    type: 'info',
+                    onConfirm: () => setShowStatusModal(false)
+                });
+                setShowStatusModal(true);
+            }
+        } catch (err: any) {
+            console.error('[Store] Test greeting catch:', err);
+            setStatusModalConfig({
+                title: 'Eror Sistem',
+                message: 'Gagal memanggil mesin suara: ' + err.message,
+                type: 'danger',
+                onConfirm: () => setShowStatusModal(false)
+            });
+            setShowStatusModal(true);
         }
     };
 
@@ -282,6 +352,37 @@ export default function StoreScreen() {
                         />
                     </View>
 
+                    <View style={tw`flex-row items-center justify-between pt-2 border-t border-gray-100 mt-2`}>
+                        <View style={tw`flex-row items-center gap-2`}>
+                            <Store size={16} color="#4b5563" />
+                            <Text style={tw`text-gray-700 font-medium text-sm`}>Wajib Buka Shift</Text>
+                        </View>
+                        <Switch
+                            value={enforceShift}
+                            onValueChange={setEnforceShift}
+                            trackColor={{ false: '#e5e7eb', true: '#BFDBFE' }}
+                            thumbColor={enforceShift ? '#2563eb' : '#f3f4f6'}
+                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                        />
+                    </View>
+
+                    <View style={tw`flex-row items-center justify-between pt-2 border-t border-gray-100 mt-2`}>
+                        <View style={tw`flex-1`}>
+                            <View style={tw`flex-row items-center gap-2`}>
+                                <FileText size={16} color="#4b5563" />
+                                <Text style={tw`text-gray-700 font-medium text-sm`}>Suara Salam (Buka Shift)</Text>
+                            </View>
+                            <Text style={tw`text-gray-400 text-[10px]`}>Suara "Assalamualaikum" saat buka kasir</Text>
+                        </View>
+                        <Switch
+                            value={enableGreeting}
+                            onValueChange={setEnableGreeting}
+                            trackColor={{ false: '#e5e7eb', true: '#BFDBFE' }}
+                            thumbColor={enableGreeting ? '#2563eb' : '#f3f4f6'}
+                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                        />
+                    </View>
+
                     {/* Offline Mode Toggle */}
                     <View style={tw`flex-row items-center justify-between pt-3 mt-2 border-t border-gray-100`}>
                         <View style={tw`flex-1 mr-4`}>
@@ -301,6 +402,13 @@ export default function StoreScreen() {
                             style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                         />
                     </View>
+
+                    <TouchableOpacity
+                        onPress={testGreeting}
+                        style={tw`mt-2 bg-blue-50 p-2 rounded-lg items-center border border-blue-100`}
+                    >
+                        <Text style={tw`text-blue-600 font-bold text-xs`}>🔊 Tes Suara Salam</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Tampilan Menu Kasir */}

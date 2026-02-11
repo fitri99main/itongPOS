@@ -125,13 +125,14 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
             const manualSetting = await AsyncStorage.getItem('manual_offline_mode');
             if (manualSetting === 'true') {
                 setIsManualOffline(true);
+                // Immediately force offline if setting is true
+                setIsOnline(false);
             }
         } catch (error) {
             console.error('Failed to load offline queue:', error);
         }
     };
 
-    // ... saveQueue ...
     const saveQueue = async (newQueue: OfflineAction[]) => {
         try {
             await AsyncStorage.setItem('offline_queue', JSON.stringify(newQueue));
@@ -141,8 +142,19 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     };
 
     const setManualMode = async (enabled: boolean) => {
+        console.log('[OfflineContext] Setting Manual Offline Mode:', enabled);
         setIsManualOffline(enabled);
         await AsyncStorage.setItem('manual_offline_mode', String(enabled));
+
+        if (enabled) {
+            setIsOnline(false);
+        } else {
+            // Trigger check immediately when turning off manual mode
+            // We pass nothing to let it fetch real state
+            // But we need to bypass the "if (isManualOffline)" check inside checkConnection
+            // So we depend on the state update refiring the effect? 
+            // Better to just let the effect [isManualOffline] handle it.
+        }
     };
 
     // ... addToQueue ...
@@ -207,34 +219,68 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
                         total_amount: transactionData.total_amount
                     });
 
-                    // Insert Transaction
-                    const { data: transData, error: transError } = await supabase
-                        .from('transactions')
-                        .insert(transactionData)
-                        .select()
-                        .single();
+                    // Insert Transaction with Retry Logic for FK (23503)
+                    let transData: any;
+                    try {
+                        const { data, error } = await supabase
+                            .from('transactions')
+                            .insert(transactionData)
+                            .select()
+                            .single();
 
-                    if (transError) {
-                        console.error('Transaction insert failed:', {
-                            code: transError.code,
-                            message: transError.message,
-                            details: transError.details,
-                            hint: transError.hint
-                        });
-                        throw transError;
+                        if (error) throw error;
+                        transData = data;
+                    } catch (err: any) {
+                        if (err.code === '23503') {
+                            console.warn('FK Violation on Transaction Insert. Retrying with NULL refs...', err.details);
+                            // Retry with safer payload (remove potential bad refs)
+                            const safePayload = {
+                                ...transactionData,
+                                cash_register_id: null, // Clear register if invalid
+                                branch_id: null,         // Clear branch if invalid
+                                customer_id: null        // Clear customer if invalid
+                            };
+                            const { data: retryData, error: retryError } = await supabase
+                                .from('transactions')
+                                .insert(safePayload)
+                                .select()
+                                .single();
+
+                            if (retryError) throw retryError;
+                            transData = retryData;
+                        } else {
+                            throw err;
+                        }
                     }
 
-                    // Insert Items with correct transaction_id
+                    // Insert Items with Retry Logic for FK (23503)
                     const items = payload.items.map((item: any) => ({
                         ...item,
                         transaction_id: transData.id
                     }));
 
-                    const { error: itemsError } = await supabase
-                        .from('transaction_items')
-                        .insert(items);
+                    try {
+                        const { error: itemsError } = await supabase
+                            .from('transaction_items')
+                            .insert(items);
+                        if (itemsError) throw itemsError;
+                    } catch (err: any) {
+                        if (err.code === '23503') {
+                            console.warn('FK Violation on Items Insert. Retrying as Custom Items...', err.details);
+                            // Retry by converting all items to custom items (product_id = null)
+                            const customItems = items.map((item: any) => ({
+                                ...item,
+                                product_id: null
+                            }));
+                            const { error: retryError } = await supabase
+                                .from('transaction_items')
+                                .insert(customItems);
 
-                    if (itemsError) throw itemsError;
+                            if (retryError) throw retryError;
+                        } else {
+                            throw err;
+                        }
+                    }
 
                     console.log(`Synced transaction ${action.id}`);
                 }

@@ -19,17 +19,17 @@ export function CartFab() {
             { paddingBottom: insets.bottom + 16, paddingTop: 16, paddingHorizontal: 16 }
         ]}>
             <TouchableOpacity
-                style={tw`bg-blue-600 rounded-xl p-4 flex-row items-center justify-between shadow-lg`}
+                style={tw`bg-gray-900 rounded-xl p-4 flex-row items-center justify-between shadow-lg`}
                 activeOpacity={0.8}
                 onPress={() => router.push('/cart')}
             >
                 {/* Left: Count */}
                 <View style={tw`flex-row items-center gap-3`}>
-                    <View style={tw`bg-blue-500 rounded-lg h-10 w-10 items-center justify-center`}>
+                    <View style={tw`bg-gray-800 rounded-lg h-10 w-10 items-center justify-center`}>
                         <Text style={tw`text-white font-bold text-lg`}>{itemCount}</Text>
                     </View>
                     <View>
-                        <Text style={tw`text-blue-100 text-xs`}>Total</Text>
+                        <Text style={tw`text-gray-400 text-xs`}>Total</Text>
                         <Text style={tw`text-white font-bold text-lg`}>
                             Rp {total.toLocaleString('id-ID')}
                         </Text>

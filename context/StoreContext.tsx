@@ -12,6 +12,7 @@ export interface StoreSettings {
     footerMessage: string;
     paperSize: string;
     autoPrint: boolean;
+    enforceShift: boolean; // New setting
     enableQris: boolean;
     enableTransfer: boolean;
     enableDebit: boolean;
@@ -28,6 +29,7 @@ export interface StoreSettings {
     showRecall: boolean;
     showGuest: boolean;
     showManual: boolean;
+    enableGreeting: boolean; // New setting
 }
 
 interface StoreContextType {
@@ -61,6 +63,8 @@ const defaultSettings: StoreSettings = {
     showRecall: true,
     showGuest: true,
     showManual: true,
+    enforceShift: false,
+    enableGreeting: true, // Default is true
 };
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -126,6 +130,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 footerMessage: data.footer_message ?? prev.footerMessage,
                 paperSize: data.paper_size ?? prev.paperSize,
                 autoPrint: data.auto_print ?? prev.autoPrint,
+                enforceShift: data.enforce_shift ?? prev.enforceShift,
                 enableQris: data.enable_qris ?? prev.enableQris,
                 enableTransfer: data.enable_transfer ?? prev.enableTransfer,
                 enableDebit: data.enable_debit ?? prev.enableDebit,
@@ -145,6 +150,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 next.showRecall = data.settings.showRecall ?? next.showRecall;
                 next.showGuest = data.settings.showGuest ?? next.showGuest;
                 next.showManual = data.settings.showManual ?? next.showManual;
+                next.enableGreeting = data.settings.enableGreeting ?? next.enableGreeting;
             }
 
             AsyncStorage.setItem('store_settings_v2', JSON.stringify(next));
@@ -190,6 +196,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                     footer_message: updated.footerMessage,
                     paper_size: updated.paperSize,
                     auto_print: updated.autoPrint,
+                    enforce_shift: updated.enforceShift,
                     enable_qris: updated.enableQris,
                     enable_transfer: updated.enableTransfer,
                     enable_debit: updated.enableDebit,
@@ -206,6 +213,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                         showRecall: updated.showRecall,
                         showGuest: updated.showGuest,
                         showManual: updated.showManual,
+                        enableGreeting: updated.enableGreeting,
                     }
                 };
 

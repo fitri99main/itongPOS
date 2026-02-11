@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { Plus, User, ArrowLeft, Trash2, Pencil } from 'lucide-react-native';
@@ -73,32 +73,8 @@ export default function UsersScreen() {
     };
 
     const handleDelete = (user: Profile) => {
-        Alert.alert(
-            'Hapus Pengguna',
-            `Apakah Anda yakin ingin menghapus akses untuk ${user.email}? Pengguna ini tidak akan bisa login lagi.`,
-            [
-                { text: 'Batal', style: 'cancel' },
-                {
-                    text: 'Hapus',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            const { error } = await supabase
-                                .from('profiles')
-                                .delete()
-                                .eq('id', user.id);
-
-                            if (error) throw error;
-
-                            Alert.alert('Sukses', 'Pengguna berhasil dihapus.');
-                            fetchUsers();
-                        } catch (error: any) {
-                            Alert.alert('Error', error.message || 'Gagal menghapus pengguna.');
-                        }
-                    }
-                }
-            ]
-        );
+        setSelectedUser(user);
+        setIsDeleteModalVisible(true);
     };
 
     const confirmDelete = async () => {

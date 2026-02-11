@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, useWindowDimensions, Platform, SafeAreaView, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions, Platform, SafeAreaView, Modal } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCart } from '../../context/CartContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -119,7 +119,13 @@ export default function PaymentScreen() {
             timer = setTimeout(() => {
                 console.warn('[PaymentScreen] Processing timed out');
                 setIsProcessing(false);
-                Alert.alert('Timeout', 'Proses pembayaran memakan waktu terlalu lama. Silakan coba lagi atau cek koneksi internet.');
+                setModalConfig({
+                    title: 'Waktu Habis',
+                    message: 'Proses pembayaran memakan waktu terlalu lama. Silakan coba lagi atau cek koneksi internet.',
+                    type: 'danger',
+                    action: 'error'
+                });
+                setShowModal(true);
             }, 15000); // 15 seconds max
         }
         return () => clearTimeout(timer);
@@ -240,8 +246,8 @@ export default function PaymentScreen() {
                     {/* Top: Total & Method (Side by Side) */}
                     <View style={tw`flex-row gap-2 h-24`}>
                         {/* Total Box */}
-                        <View style={tw`flex-1 bg-blue-600 rounded-xl p-3 justify-center items-start shadow-sm`}>
-                            <Text style={tw`text-blue-100 text-[10px] font-bold uppercase mb-1`}>Total Tagihan</Text>
+                        <View style={tw`flex-1 bg-gray-900 rounded-xl p-3 justify-center items-start shadow-sm`}>
+                            <Text style={tw`text-gray-100 text-[10px] font-bold uppercase mb-1`}>Total Tagihan</Text>
                             <Text style={tw`text-2xl font-black text-white`} adjustsFontSizeToFit numberOfLines={1}>
                                 {formatCurrency(total)}
                             </Text>
@@ -331,7 +337,7 @@ export default function PaymentScreen() {
                             <TouchableOpacity
                                 onPress={() => handleProcessPayment()}
                                 disabled={isProcessing}
-                                style={tw`h-12 rounded-xl items-center flex-row justify-center gap-2 ${(receivedAmount >= total || storeSettings.showPreviewBeforePay) ? 'bg-blue-600 shadow-md' : 'bg-gray-300'}`}
+                                style={tw`h-12 rounded-xl items-center flex-row justify-center gap-2 ${(receivedAmount >= total || storeSettings.showPreviewBeforePay) ? 'bg-gray-900 shadow-md' : 'bg-gray-300'}`}
                             >
                                 <Text style={tw`text-white font-bold text-lg`}>{isProcessing ? 'MEMPROSES...' : 'BAYAR'}</Text>
                             </TouchableOpacity>
@@ -386,7 +392,7 @@ export default function PaymentScreen() {
                                 </View>
                                 <TouchableOpacity
                                     onPress={() => handleProcessPayment()}
-                                    style={tw`bg-blue-600 h-14 rounded-xl items-center justify-center shadow-lg`}
+                                    style={tw`bg-gray-900 h-14 rounded-xl items-center justify-center shadow-lg`}
                                 >
                                     <Text style={tw`text-white font-bold text-lg`}>{isProcessing ? 'MEMPROSES...' : `KONFIRMASI LUNAS (${selectedCashlessType})`}</Text>
                                 </TouchableOpacity>
@@ -525,10 +531,10 @@ export default function PaymentScreen() {
                 {/* LEFT PANEL: Summary */}
                 <View style={tw`flex-1 p-6`}>
                     {/* Amount Hero */}
-                    <View style={tw`p-8 rounded-3xl mb-8 bg-blue-600 shadow-lg items-center justify-center`}>
-                        <Text style={tw`text-blue-100 font-medium text-xs uppercase tracking-widest mb-1`}>Total Tagihan</Text>
+                    <View style={tw`p-8 rounded-3xl mb-8 bg-gray-900 shadow-lg items-center justify-center`}>
+                        <Text style={tw`text-gray-100 font-medium text-xs uppercase tracking-widest mb-1`}>Total Tagihan</Text>
                         <Text style={tw`text-5xl font-black text-white`}>{formatCurrency(total)}</Text>
-                        {discount > 0 && <View style={tw`bg-blue-700/50 px-3 py-1 rounded-full mt-2`}><Text style={tw`text-blue-200 text-xs`}>Hemat {formatCurrency(discount)}</Text></View>}
+                        {discount > 0 && <View style={tw`bg-gray-700/50 px-3 py-1 rounded-full mt-2`}><Text style={tw`text-gray-200 text-xs`}>Hemat {formatCurrency(discount)}</Text></View>}
                     </View>
 
                     {/* Method Switcher */}
@@ -590,7 +596,7 @@ export default function PaymentScreen() {
                                 </TouchableOpacity>
                             </View>
                         </View>
-                        <TouchableOpacity onPress={() => handleProcessPayment()} disabled={receivedAmount < total || isProcessing} style={tw`w-full py-5 rounded-2xl items-center shadow-lg flex-row justify-center gap-3 ${receivedAmount >= total ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                        <TouchableOpacity onPress={() => handleProcessPayment()} disabled={receivedAmount < total || isProcessing} style={tw`w-full py-5 rounded-2xl items-center shadow-lg flex-row justify-center gap-3 ${receivedAmount >= total ? 'bg-gray-900' : 'bg-gray-300'}`}>
                             <Check size={28} color="white" />
                             <Text style={tw`text-white font-bold text-xl`}>{isProcessing ? 'MEMPROSES...' : 'PROSES BAYAR'}</Text>
                         </TouchableOpacity>
@@ -602,7 +608,7 @@ export default function PaymentScreen() {
                             <Text style={tw`text-gray-900 font-bold text-xl text-center`}>Menunggu Pembayaran...</Text>
                             <Text style={tw`text-gray-500 text-center mt-2 px-4`}>Gunakan EDC / QRIS.</Text>
                         </View>
-                        <TouchableOpacity onPress={() => handleProcessPayment()} style={tw`w-full bg-blue-600 py-4 rounded-xl items-center shadow-lg`}>
+                        <TouchableOpacity onPress={() => handleProcessPayment()} style={tw`w-full bg-gray-900 py-4 rounded-xl items-center shadow-lg`}>
                             <Text style={tw`text-white font-bold text-lg`}>{isProcessing ? 'MEMPROSES...' : 'KONFIRMASI LUNAS'}</Text>
                         </TouchableOpacity>
                     </View>

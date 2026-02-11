@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { ArrowLeft, Landmark, Calculator, Receipt, AlertCircle, CheckCircle2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
+import { ConfirmationModal } from '../../components/ConfirmationModal';
 
 export default function CloseRegister() {
     const router = useRouter();
@@ -16,6 +17,15 @@ export default function CloseRegister() {
     const [loading, setLoading] = useState(false);
     const [summary, setSummary] = useState({ totalSales: 0, expected: 0 });
     const [calculating, setCalculating] = useState(true);
+
+    // Modal State
+    const [showModal, setShowModal] = useState(false);
+    const [modalConfig, setModalConfig] = useState({
+        title: '',
+        message: '',
+        type: 'info' as 'info' | 'success' | 'danger' | 'warning',
+        action: 'none' as 'none' | 'success' | 'confirm'
+    });
 
     useEffect(() => {
         if (activeRegister) {
@@ -48,18 +58,16 @@ export default function CloseRegister() {
 
     const handleClose = async () => {
         const numActual = parseFloat(actualBalance.replace(/[^0-9]/g, '')) || 0;
-
         const diff = numActual - summary.expected;
 
         if (Math.abs(diff) > 0) {
-            Alert.alert(
-                'Selisih Ditemukan',
-                `Ada selisih sebesar Rp ${diff.toLocaleString('id-ID')}. Apakah Anda yakin ingin menutup kasir?`,
-                [
-                    { text: 'Batal', style: 'cancel' },
-                    { text: 'Ya, Tutup', onPress: () => performClose(numActual) }
-                ]
-            );
+            setModalConfig({
+                title: 'Selisih Ditemukan',
+                message: `Ada selisih sebesar Rp ${Math.abs(diff).toLocaleString('id-ID')}. Apakah Anda yakin ingin menutup kasir?`,
+                type: 'warning',
+                action: 'confirm'
+            });
+            setShowModal(true);
         } else {
             performClose(numActual);
         }
@@ -71,10 +79,21 @@ export default function CloseRegister() {
             const { error } = await closeRegister(numActual, notes);
             if (error) throw error;
 
-            Alert.alert('Berhasil', 'Kasir telah ditutup. Shift berakhir.');
-            router.replace('/register');
+            setModalConfig({
+                title: 'Berhasil',
+                message: 'Kasir telah ditutup. Shift berakhir.',
+                type: 'success',
+                action: 'success'
+            });
+            setShowModal(true);
         } catch (error: any) {
-            Alert.alert('Gagal', error.message || 'Terjadi kesalahan saat menutup kasir');
+            setModalConfig({
+                title: 'Gagal',
+                message: error.message || 'Terjadi kesalahan saat menutup kasir',
+                type: 'danger',
+                action: 'none'
+            });
+            setShowModal(true);
         } finally {
             setLoading(false);
         }
@@ -198,6 +217,25 @@ export default function CloseRegister() {
                     )}
                 </TouchableOpacity>
             </ScrollView>
+
+            <ConfirmationModal
+                visible={showModal}
+                title={modalConfig.title}
+                message={modalConfig.message}
+                type={modalConfig.type}
+                confirmText={modalConfig.action === 'confirm' ? 'Ya, Tutup' : 'OK'}
+                cancelText={modalConfig.action === 'confirm' ? 'Batal' : null}
+                onConfirm={() => {
+                    setShowModal(false);
+                    if (modalConfig.action === 'confirm') {
+                        const numActual = parseFloat(actualBalance.replace(/[^0-9]/g, '')) || 0;
+                        performClose(numActual);
+                    } else if (modalConfig.action === 'success') {
+                        router.replace('/register');
+                    }
+                }}
+                onCancel={() => setShowModal(false)}
+            />
         </KeyboardAvoidingView>
     );
 }

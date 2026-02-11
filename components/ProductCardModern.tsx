@@ -29,7 +29,7 @@ export function ProductCardModern({ product }: { product: Product }) {
                     </View>
                 )}
                 {/* Floating Add Button */}
-                <View style={tw`absolute bottom-1 right-1 bg-blue-600 rounded-full p-1.5 shadow-lg elevation-4`}>
+                <View style={tw`absolute bottom-1 right-1 bg-gray-900 rounded-full p-1.5 shadow-lg elevation-4`}>
                     <Plus size={14} color="white" strokeWidth={3} />
                 </View>
             </View>

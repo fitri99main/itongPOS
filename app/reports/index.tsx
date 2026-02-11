@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Calendar, RefreshCw } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
+import { ConfirmationModal } from '../../components/ConfirmationModal';
 
 type FilterPeriod = 'today' | 'week' | 'month' | 'all';
 
@@ -19,6 +20,16 @@ export default function ReportsScreen() {
         returns: 0,
         profit: 0,
         transactionCount: 0
+    });
+
+    // Notification/Action Modal State
+    const [showStatusModal, setShowStatusModal] = useState(false);
+    const [statusModalConfig, setStatusModalConfig] = useState({
+        title: '',
+        message: '',
+        type: 'info' as 'info' | 'success' | 'danger' | 'warning',
+        onConfirm: () => { },
+        children: null as React.ReactNode
     });
 
     useFocusEffect(
@@ -38,17 +49,32 @@ export default function ReportsScreen() {
     };
 
     const handleFilterPress = () => {
-        Alert.alert(
-            'Pilih Periode Laporan',
-            'Tampilkan data untuk rentang waktu:',
-            [
-                { text: 'Hari Ini', onPress: () => setFilterPeriod('today') },
-                { text: 'Minggu Ini (7 Hari)', onPress: () => setFilterPeriod('week') },
-                { text: 'Bulan Ini', onPress: () => setFilterPeriod('month') },
-                { text: 'Semua Waktu', onPress: () => setFilterPeriod('all') },
-                { text: 'Batal', style: 'cancel' }
-            ]
-        );
+        const periods: FilterPeriod[] = ['today', 'week', 'month', 'all'];
+        const labels = ['Hari Ini', 'Minggu Ini (7 Hari)', 'Bulan Ini', 'Semua Waktu'];
+
+        setStatusModalConfig({
+            title: 'Pilih Periode',
+            message: 'Tampilkan data untuk rentang waktu:',
+            type: 'info',
+            onConfirm: () => setShowStatusModal(false),
+            children: (
+                <View style={tw`gap-2 mt-4`}>
+                    {periods.map((p, i) => (
+                        <TouchableOpacity
+                            key={p}
+                            onPress={() => {
+                                setFilterPeriod(p);
+                                setShowStatusModal(false);
+                            }}
+                            style={tw`bg-gray-50 p-4 rounded-xl border border-gray-100 items-center ${filterPeriod === p ? 'bg-blue-50 border-blue-200' : ''}`}
+                        >
+                            <Text style={tw`font-bold ${filterPeriod === p ? 'text-blue-700' : 'text-gray-700'}`}>{labels[i]}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            )
+        });
+        setShowStatusModal(true);
     };
 
     const fetchSummary = async () => {
@@ -151,7 +177,14 @@ export default function ReportsScreen() {
 
         } catch (error: any) {
             console.error('Error fetching reports:', error);
-            Alert.alert('Gagal Memuat Laporan', error.message);
+            setStatusModalConfig({
+                title: 'Gagal Memuat Laporan',
+                message: error.message,
+                type: 'danger',
+                onConfirm: () => setShowStatusModal(false),
+                children: null
+            });
+            setShowStatusModal(true);
         } finally {
             setLoading(false);
         }
@@ -235,8 +268,8 @@ export default function ReportsScreen() {
                         style={tw`bg-white p-4 rounded-xl border border-gray-200 flex-row items-center justify-between active:bg-gray-50`}
                     >
                         <View style={tw`flex-row items-center gap-3`}>
-                            <View style={tw`bg-gray-100 p-2 rounded-lg`}>
-                                <DollarSign size={20} color="#4b5563" />
+                            <View style={tw`bg-gray-100 min-w-[32px] h-8 items-center justify-center rounded-lg`}>
+                                <Text style={tw`text-gray-600 font-bold text-xs`}>Rp</Text>
                             </View>
                             <View>
                                 <Text style={tw`font-bold text-gray-900`}>Lihat Detail Transaksi</Text>
@@ -248,6 +281,19 @@ export default function ReportsScreen() {
 
                 </ScrollView>
             )}
+
+            <ConfirmationModal
+                visible={showStatusModal}
+                title={statusModalConfig.title}
+                message={statusModalConfig.message}
+                type={statusModalConfig.type}
+                confirmText={statusModalConfig.title.includes('Pilih') ? null : 'OK'}
+                cancelText={statusModalConfig.title.includes('Pilih') ? 'Batal' : null}
+                onConfirm={statusModalConfig.onConfirm}
+                onCancel={() => setShowStatusModal(false)}
+            >
+                {statusModalConfig.children}
+            </ConfirmationModal>
         </View>
     );
 }

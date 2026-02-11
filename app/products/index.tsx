@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -63,7 +63,13 @@ export default function ProductsScreen() {
             setCategories(categoriesRes.data || []);
         } catch (error) {
             console.error('Error fetching data:', error);
-            Alert.alert('Error', 'Gagal memuat data');
+            setStatusModalConfig({
+                title: 'Eror',
+                message: 'Gagal memuat data produk dan kategori',
+                type: 'danger',
+                onConfirm: () => setShowStatusModal(false)
+            });
+            setShowStatusModal(true);
         } finally {
             setLoading(false);
         }
@@ -233,7 +239,7 @@ export default function ProductsScreen() {
             setFormData({
                 name: product.name,
                 price: product.price.toString(),
-                cost_price: (product as any).cost_price?.toString() || '0',
+                cost_price: product.cost_price?.toString() || '0',
                 stock: product.stock.toString(),
                 category_id: product.category_id,
                 description: product.description || '',

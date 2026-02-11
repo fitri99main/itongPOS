@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image } from 'react-native';
 import { useCart } from '../context/CartContext';
 import { useRouter } from 'expo-router';
 import { useRegister } from '../context/RegisterContext';
@@ -13,19 +13,13 @@ export default function Cart() {
     const { items, updateQuantity, removeItem, total, subtotal, discount, clearCart } = useCart();
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const [showRegisterAlert, setShowRegisterAlert] = useState(false);
 
     const { activeRegister } = useRegister();
 
     const handleCheckout = () => {
         if (!activeRegister) {
-            Alert.alert(
-                'Kasir Tertutup',
-                'Anda harus membuka kasir (shift) terlebih dahulu sebelum dapat melakukan transaksi.',
-                [
-                    { text: 'Batal', style: 'cancel' },
-                    { text: 'Buka Kasir', onPress: () => router.push('/register' as any) }
-                ]
-            );
+            setShowRegisterAlert(true);
             return;
         }
         router.push('/checkout/payment');
@@ -44,7 +38,7 @@ export default function Cart() {
                 </Text>
                 <TouchableOpacity
                     onPress={() => router.back()}
-                    style={tw`bg-blue-600 px-6 py-3 rounded-xl`}
+                    style={tw`bg-gray-900 px-6 py-3 rounded-xl`}
                 >
                     <Text style={tw`text-white font-bold`}>Kembali Belanja</Text>
                 </TouchableOpacity>
@@ -155,12 +149,26 @@ export default function Cart() {
 
                     <TouchableOpacity
                         onPress={handleCheckout}
-                        style={tw`bg-blue-600 py-4 rounded-xl items-center shadow-md active:bg-blue-700`}
+                        style={tw`bg-gray-900 py-4 rounded-xl items-center shadow-md active:bg-gray-800`}
                     >
                         <Text style={tw`text-white font-bold text-lg`}>Bayar Sekarang</Text>
                     </TouchableOpacity>
                 </View>
             </View>
-        </View>
+
+            <ConfirmationModal
+                visible={showRegisterAlert}
+                title="Kasir Belum Dibuka"
+                message="Anda harus membuka kasir (shift) terlebih dahulu sebelum dapat melakukan transaksi pembayaran."
+                type="warning"
+                confirmText="Buka Kasir Sekarang"
+                cancelText="Batal"
+                onConfirm={() => {
+                    setShowRegisterAlert(false);
+                    router.push('/register' as any);
+                }}
+                onCancel={() => setShowRegisterAlert(false)}
+            />
+        </View >
     );
 }

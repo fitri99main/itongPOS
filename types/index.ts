@@ -2,6 +2,7 @@ export interface Product {
     id: string;
     name: string;
     price: number;
+    cost_price: number;
     image_url: string | null;
     category_id: string;
     stock: number;
@@ -36,6 +37,7 @@ export interface TransactionItem {
     product_id: string | null;
     quantity: number;
     price: number;
+    cost_price: number;
     product_name?: string;
     product?: Product;
 }

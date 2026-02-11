@@ -3,7 +3,10 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 import { LicenseProvider, useLicense } from '../context/LicenseContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, LogBox } from 'react-native';
+
+// Ignore all log notifications for a cleaner demo experience
+LogBox.ignoreAllLogs(true);
 import { CartProvider } from '../context/CartContext';
 import { OfflineProvider } from '../context/OfflineContext';
 import { PrinterProvider } from '../context/PrinterContext';
@@ -12,9 +15,14 @@ import { StoreProvider } from '../context/StoreContext';
 
 const queryClient = new QueryClient();
 
+import { ConfirmationModal } from '../components/ConfirmationModal';
+
 function RootLayoutNav() {
-    const { session, loading: authLoading } = useAuth();
+    const { session, loading: authLoading, isSessionHijacked, signOut, clearSessionHijack } = useAuth();
     const { isActivated, daysLeft, loading: licenseLoading } = useLicense();
+
+    console.log('[RootLayoutNav] render - isSessionHijacked:', isSessionHijacked);
+
     const segments = useSegments();
     const router = useRouter();
 
@@ -46,11 +54,29 @@ function RootLayoutNav() {
         )
     }
 
+    const handleHijackClose = async () => {
+        await signOut();
+        clearSessionHijack();
+    };
+
     return (
-        <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="login" />
-        </Stack>
+        <>
+            <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="login" />
+            </Stack>
+
+            <ConfirmationModal
+                visible={isSessionHijacked}
+                title="Sesi Berakhir"
+                message="Akun anda sudah login di perangkat lain. Silakan login kembali jika ini adalah Anda."
+                confirmText="Tutup"
+                cancelText={null}
+                onConfirm={handleHijackClose}
+                onCancel={handleHijackClose}
+                type="warning"
+            />
+        </>
     );
 }
 

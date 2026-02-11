@@ -1,17 +1,32 @@
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { usePrinter } from '../../context/PrinterContext';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Printer, RefreshCw, Bluetooth, Check } from 'lucide-react-native';
 import tw from 'twrnc';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ConfirmationModal } from '../../components/ConfirmationModal';
 
 export default function PrinterSettingsScreen() {
     const router = useRouter();
     const { devices, isScanning, scanDevices, connectPrinter, connectedDevice, printReceipt } = usePrinter();
 
+    // Notification Modal State
+    const [showStatusModal, setShowStatusModal] = useState(false);
+    const [statusModalConfig, setStatusModalConfig] = useState({
+        title: '',
+        message: '',
+        type: 'info' as 'info' | 'success' | 'danger' | 'warning'
+    });
+
     const handleTestPrint = async () => {
         if (!connectedDevice) {
-            Alert.alert('Perhatian', 'Silakan hubungkan printer terlebih dahulu.');
+            setStatusModalConfig({
+                title: 'Perhatian',
+                message: 'Silakan hubungkan printer terlebih dahulu.',
+                type: 'warning'
+            });
+            setShowStatusModal(true);
             return;
         }
         await printReceipt(
@@ -110,6 +125,17 @@ export default function PrinterSettingsScreen() {
                     }
                 />
             </View>
+
+            <ConfirmationModal
+                visible={showStatusModal}
+                title={statusModalConfig.title}
+                message={statusModalConfig.message}
+                type={statusModalConfig.type}
+                confirmText="OK"
+                cancelText={null}
+                onConfirm={() => setShowStatusModal(false)}
+                onCancel={() => setShowStatusModal(false)}
+            />
         </SafeAreaView>
     );
 }

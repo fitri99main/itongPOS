@@ -65,6 +65,8 @@ export function RegisterProvider({ children }: { children: ReactNode }) {
                 .limit(1)
                 .maybeSingle();
 
+            console.log('[RegisterContext] checkActiveRegister result:', { found: !!data, status: data?.status, user: user?.id });
+
             if (error) throw error;
             setActiveRegister(data);
         } catch (err) {

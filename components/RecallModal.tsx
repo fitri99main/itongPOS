@@ -58,6 +58,9 @@ export function RecallModal({ visible, onClose }: RecallModalProps) {
                                         </View>
                                         <Text style={tw`font-bold text-lg`}>Rp {item.total.toLocaleString('id-ID')}</Text>
                                         <Text style={tw`text-gray-500 text-xs`}>{item.items.length} item • {item.customer?.name || 'Umum'}</Text>
+                                        {item.note && (
+                                            <Text style={tw`text-gray-500 text-xs italic mt-1`}>"{item.note}"</Text>
+                                        )}
                                     </View>
 
                                     <View style={tw`flex-row gap-2`}>

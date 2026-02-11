@@ -1,12 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, Platform } from 'react-native';
 import { useOffline } from '../context/OfflineContext';
+import { useAuth } from '../context/AuthContext';
 import { Wifi, WifiOff, RefreshCw, CheckCircle2 } from 'lucide-react-native';
 import tw from 'twrnc';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function NetworkStatus() {
     const { isOnline, isSyncing, queue } = useOffline();
+    const { role } = useAuth();
     const insets = useSafeAreaInsets();
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -52,8 +54,12 @@ export function NetworkStatus() {
     const currentConfig = config[status];
     const Icon = currentConfig.icon;
 
-    // Don't show anything if standard "Online & Synced" to keep UI clean?
-    // User requested: "Green online". So we show it small.
+    // User requested: hide green online for cashier
+    if (status === 'synced' && role !== 'admin') {
+        return null;
+    }
+
+    // Small delay to ensure the animation is visible
 
     return (
         <Animated.View

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, ScrollView, Linking } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Modal, ScrollView, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft, Plus, Search, Edit2, Trash2, X, Users, Phone, Mail, MapPin, AlertCircle } from 'lucide-react-native';
@@ -70,7 +70,13 @@ export default function CustomersScreen() {
             }
         } catch (error: any) {
             console.error('Error fetching customers:', error);
-            // Alert.alert('Eror', 'Gagal memuat data pelanggan');
+            setStatusModalConfig({
+                title: 'Eror',
+                message: 'Gagal memuat data pelanggan',
+                type: 'danger',
+                onConfirm: () => setShowStatusModal(false)
+            });
+            setShowStatusModal(true);
         } finally {
             setLoading(false);
         }

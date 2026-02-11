@@ -4,6 +4,7 @@ import { useCart } from '../context/CartContext';
 import { Calculator, PauseCircle, Percent, SplitSquareHorizontal, X, ArrowRightCircle, Archive, Trash2, PlayCircle } from 'lucide-react-native';
 import tw from 'twrnc';
 import { Ticket } from 'lucide-react-native';
+import { ConfirmationModal } from './ConfirmationModal';
 
 export function ActionButtons() {
     const { addCustomItem, holdOrder, setDiscount, discount, total, heldOrders, resumeHeldOrder, removeHeldOrder } = useCart();
@@ -17,6 +18,13 @@ export function ActionButtons() {
     const [customName, setCustomName] = useState('');
     const [customPrice, setCustomPrice] = useState('');
     const [discountValue, setDiscountValue] = useState('');
+
+    // Hold Order State
+    const [showHoldModal, setShowHoldModal] = useState(false);
+    const [holdNote, setHoldNote] = useState('');
+
+    // Success Notification State
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // Expense State
     const [showExpense, setShowExpense] = useState(false);
@@ -72,20 +80,15 @@ export function ActionButtons() {
             Alert.alert("Eror", "Keranjang kosong");
             return;
         }
+        setShowHoldModal(true);
+    };
 
-        Alert.alert(
-            "Hold Order?",
-            "Order saat ini akan disimpan dan keranjang dikosongkan.",
-            [
-                { text: "Batal", style: "cancel" },
-                {
-                    text: "Hold", onPress: async () => {
-                        await holdOrder();
-                        Alert.alert("Tersimpan", "Order berhasil disimpan! Tekan tombol Recall untuk membuka kembali.");
-                    }
-                }
-            ]
-        );
+    const confirmHold = async () => {
+        await holdOrder(holdNote);
+        setShowHoldModal(false);
+        setHoldNote('');
+        // Show success modal immediately
+        setShowSuccessModal(true);
     };
 
     const handleResume = async (id: string) => {
@@ -198,6 +201,9 @@ export function ActionButtons() {
                                             </View>
                                             <Text style={tw`font-bold text-lg`}>Rp {item.total.toLocaleString('id-ID')}</Text>
                                             <Text style={tw`text-gray-500 text-xs`}>{item.items.length} item • {item.customer?.name || 'Umum'}</Text>
+                                            {item.note && (
+                                                <Text style={tw`text-gray-500 text-xs italic mt-1`}>"{item.note}"</Text>
+                                            )}
                                         </View>
 
                                         <View style={tw`flex-row gap-2`}>
@@ -286,6 +292,33 @@ export function ActionButtons() {
                 </View>
             </Modal>
 
+            {/* Hold Order Modal */}
+            <Modal visible={showHoldModal} transparent animationType="fade">
+                <View style={tw`flex-1 bg-black/50 justify-center items-center p-4`}>
+                    <View style={tw`bg-white w-full max-w-sm rounded-2xl p-6`}>
+                        <View style={tw`flex-row justify-between items-center mb-4`}>
+                            <Text style={tw`text-lg font-bold`}>Simpan Order (Hold)</Text>
+                            <TouchableOpacity onPress={() => setShowHoldModal(false)}>
+                                <X size={24} color="gray" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={tw`text-gray-600 mb-1`}>Keterangan (Opsional)</Text>
+                        <TextInput
+                            style={tw`border border-gray-300 rounded-lg p-3 mb-6 bg-gray-50`}
+                            placeholder="Contoh: Meja 5, pesanan Pak Budi"
+                            value={holdNote}
+                            onChangeText={setHoldNote}
+                            autoFocus
+                        />
+
+                        <TouchableOpacity onPress={confirmHold} style={tw`bg-yellow-500 p-3 rounded-xl items-center`}>
+                            <Text style={tw`text-white font-bold`}>Simpan Order</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
             {/* Expense Checkout Modal */}
             <Modal visible={showExpense} transparent animationType="fade">
                 <View style={tw`flex-1 bg-black/50 justify-center items-center p-4`}>
@@ -316,6 +349,24 @@ export function ActionButtons() {
                     </View>
                 </View>
             </Modal>
+
+            {/* Success Notification Modal */}
+            <ConfirmationModal
+                visible={showSuccessModal}
+                title="✅ Order Tersimpan!"
+                message="Order berhasil disimpan. Tekan tombol 'Recall' untuk membuka kembali order yang disimpan."
+                type="success"
+                confirmText="OK"
+                cancelText={null}
+                onConfirm={() => {
+                    setShowSuccessModal(false);
+                    clearCart(); // Clear cart when user dismisses the modal
+                }}
+                onCancel={() => {
+                    setShowSuccessModal(false);
+                    clearCart(); // Clear cart when user dismisses the modal
+                }}
+            />
         </View>
     );
 }

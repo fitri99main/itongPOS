@@ -1,24 +1,43 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useRegister } from '../../context/RegisterContext';
+import { useStore } from '../../context/StoreContext';
+import { useAuth } from '../../context/AuthContext';
+import * as Speech from 'expo-speech';
 import { ArrowLeft, CircleDollarSign, Info } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
+import { ConfirmationModal } from '../../components/ConfirmationModal';
 
 export default function OpenRegister() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { openRegister } = useRegister();
+    const { settings } = useStore();
+    const { role } = useAuth();
     const [balance, setBalance] = useState('');
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Modal State
+    const [showModal, setShowModal] = useState(false);
+    const [modalConfig, setModalConfig] = useState({
+        title: '',
+        message: '',
+        type: 'info' as 'info' | 'success' | 'danger' | 'warning',
+    });
 
     const handleOpen = async () => {
         const numBalance = parseFloat(balance.replace(/[^0-9]/g, '')) || 0;
 
         if (numBalance < 0) {
-            Alert.alert('Error', 'Modal awal tidak boleh kurang dari 0');
+            setModalConfig({
+                title: 'Error',
+                message: 'Modal awal tidak boleh kurang dari 0',
+                type: 'danger'
+            });
+            setShowModal(true);
             return;
         }
 
@@ -27,10 +46,43 @@ export default function OpenRegister() {
             const { error } = await openRegister(numBalance, notes);
             if (error) throw error;
 
-            router.back();
-            Alert.alert('Berhasil', 'Sesi kasir telah dibuka.');
+            // Play greeting if enabled and user is a cashier
+            const roleName = role?.toLowerCase()?.trim() || '';
+            const isCashier = roleName.includes('kasir') || roleName.includes('cashier');
+
+            if (settings.enableGreeting && isCashier) {
+                try {
+                    console.log('[OpenRegister] 📢 Triggering speech engine...');
+                    await Speech.stop(); // Clear any existing queue
+                    Speech.speak('Assalamualaikum warahmatullahi wabarakatuh', {
+                        language: 'id-ID',
+                        pitch: 1.0,
+                        rate: 0.9,
+                        onStart: () => console.log('[OpenRegister] 🔊 Speech started successfully'),
+                        onDone: () => console.log('[OpenRegister] ✅ Speech finished'),
+                        onError: (error) => console.error('[OpenRegister] ❌ Speech error:', error)
+                    });
+                } catch (e) {
+                    console.error('[OpenRegister] Speech exception:', e);
+                }
+            }
+
+            // Small delay to ensure speech engine bridge is triggered before the component unmounts
+            setTimeout(() => {
+                setModalConfig({
+                    title: 'Berhasil',
+                    message: 'Sesi kasir telah dibuka.',
+                    type: 'success'
+                });
+                setShowModal(true);
+            }, 1200);
         } catch (error: any) {
-            Alert.alert('Gagal', error.message || 'Terjadi kesalahan saat membuka kasir');
+            setModalConfig({
+                title: 'Gagal',
+                message: error.message || 'Terjadi kesalahan saat membuka kasir',
+                type: 'danger'
+            });
+            setShowModal(true);
         } finally {
             setLoading(false);
         }
@@ -58,7 +110,9 @@ export default function OpenRegister() {
 
             <ScrollView contentContainerStyle={tw`p-6`}>
                 <View style={tw`bg-blue-600 rounded-2xl p-6 mb-8 shadow-lg items-center`}>
-                    <CircleDollarSign size={48} color="white" />
+                    <View style={tw`w-16 h-16 rounded-full bg-white items-center justify-center shadow-sm`}>
+                        <Text style={tw`text-blue-600 text-2xl font-black`}>Rp</Text>
+                    </View>
                     <Text style={tw`text-white text-xl font-bold mt-4`}>Masukkan Modal Awal</Text>
                     <Text style={tw`text-blue-100 mt-2 text-center`}>
                         Jumlah uang tunai yang ada di laci kasir saat ini.
@@ -110,6 +164,22 @@ export default function OpenRegister() {
                     </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            <ConfirmationModal
+                visible={showModal}
+                title={modalConfig.title}
+                message={modalConfig.message}
+                type={modalConfig.type}
+                confirmText="Selesai"
+                cancelText={null}
+                onConfirm={() => {
+                    setShowModal(false);
+                    if (modalConfig.type === 'success') {
+                        router.replace('/' as any);
+                    }
+                }}
+                onCancel={() => setShowModal(false)}
+            />
         </KeyboardAvoidingView>
     );
 }

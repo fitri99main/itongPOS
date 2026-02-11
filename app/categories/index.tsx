@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -51,7 +51,13 @@ export default function CategoriesScreen() {
             setCategories(data || []);
         } catch (error) {
             console.error('Error fetching categories:', error);
-            // Alert.alert('Eror', 'Gagal memuat kategori');
+            setStatusModalConfig({
+                title: 'Eror',
+                message: 'Gagal memuat kategori',
+                type: 'danger',
+                onConfirm: () => setShowStatusModal(false)
+            });
+            setShowStatusModal(true);
         } finally {
             setLoading(false);
         }

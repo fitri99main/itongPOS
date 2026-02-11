@@ -8,7 +8,6 @@ import { supabase } from '../../lib/supabase';
 import {
     Store,
     Clock,
-    CircleDollarSign,
     ArrowLeft,
     ChevronRight,
     History,

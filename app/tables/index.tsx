@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { Table } from '../../types';
 import { ArrowLeft, Plus, Search, Edit2, Trash2, X, Square } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
+import { ConfirmationModal } from '../../components/ConfirmationModal';
 
 export default function TablesScreen() {
     const router = useRouter();
@@ -20,6 +21,15 @@ export default function TablesScreen() {
     const [formData, setFormData] = useState({
         number: '',
         capacity: '4'
+    });
+
+    // Notification Modal State
+    const [showStatusModal, setShowStatusModal] = useState(false);
+    const [statusModalConfig, setStatusModalConfig] = useState({
+        title: '',
+        message: '',
+        type: 'info' as 'info' | 'success' | 'danger' | 'warning',
+        onConfirm: () => { }
     });
 
     useEffect(() => {
@@ -38,7 +48,13 @@ export default function TablesScreen() {
             setTables(data || []);
         } catch (error) {
             console.error('Error fetching tables:', error);
-            Alert.alert('Eror', 'Gagal memuat meja');
+            setStatusModalConfig({
+                title: 'Eror',
+                message: 'Gagal memuat data meja',
+                type: 'danger',
+                onConfirm: () => setShowStatusModal(false)
+            });
+            setShowStatusModal(true);
         } finally {
             setLoading(false);
         }
@@ -46,7 +62,13 @@ export default function TablesScreen() {
 
     const handleSave = async () => {
         if (!formData.number) {
-            Alert.alert('Eror', 'Nomor meja wajib diisi');
+            setStatusModalConfig({
+                title: 'Eror',
+                message: 'Nomor meja wajib diisi',
+                type: 'warning',
+                onConfirm: () => setShowStatusModal(false)
+            });
+            setShowStatusModal(true);
             return;
         }
 
@@ -62,44 +84,66 @@ export default function TablesScreen() {
                     .update(payload)
                     .eq('id', editingTable.id);
                 if (error) throw error;
-                Alert.alert('Sukses', 'Meja diperbarui');
+                setStatusModalConfig({
+                    title: 'Sukses',
+                    message: 'Meja diperbarui',
+                    type: 'success',
+                    onConfirm: () => setShowStatusModal(false)
+                });
+                setShowStatusModal(true);
             } else {
                 const { error } = await supabase
                     .from('tables')
                     .insert([payload]);
                 if (error) throw error;
-                Alert.alert('Sukses', 'Meja ditambahkan');
+                setStatusModalConfig({
+                    title: 'Sukses',
+                    message: 'Meja ditambahkan',
+                    type: 'success',
+                    onConfirm: () => setShowStatusModal(false)
+                });
+                setShowStatusModal(true);
             }
 
             setModalVisible(false);
             fetchTables();
             resetForm();
         } catch (error: any) {
-            Alert.alert('Eror', error.message);
+            setStatusModalConfig({
+                title: 'Eror',
+                message: error.message,
+                type: 'danger',
+                onConfirm: () => setShowStatusModal(false)
+            });
+            setShowStatusModal(true);
         }
     };
 
     const handleDelete = (id: string) => {
-        Alert.alert(
-            'Hapus Meja',
-            'Apakah Anda yakin ingin menghapus meja ini?',
-            [
-                { text: 'Batal', style: 'cancel' },
-                {
-                    text: 'Hapus',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            const { error } = await supabase.from('tables').delete().eq('id', id);
-                            if (error) throw error;
-                            fetchTables();
-                        } catch (error) {
-                            Alert.alert('Eror', 'Gagal menghapus meja');
-                        }
-                    }
+        setStatusModalConfig({
+            title: 'Hapus Meja',
+            message: 'Apakah Anda yakin ingin menghapus meja ini?',
+            type: 'danger',
+            onConfirm: async () => {
+                setShowStatusModal(false);
+                try {
+                    const { error } = await supabase.from('tables').delete().eq('id', id);
+                    if (error) throw error;
+                    fetchTables();
+                } catch (error) {
+                    setTimeout(() => {
+                        setStatusModalConfig({
+                            title: 'Eror',
+                            message: 'Gagal menghapus meja',
+                            type: 'danger',
+                            onConfirm: () => setShowStatusModal(false)
+                        });
+                        setShowStatusModal(true);
+                    }, 500);
                 }
-            ]
-        );
+            }
+        });
+        setShowStatusModal(true);
     };
 
     const openModal = (table?: Table) => {
@@ -247,6 +291,17 @@ export default function TablesScreen() {
                     </ScrollView>
                 </KeyboardAvoidingView>
             </Modal>
-        </View>
+
+            <ConfirmationModal
+                visible={showStatusModal}
+                title={statusModalConfig.title}
+                message={statusModalConfig.message}
+                type={statusModalConfig.type}
+                confirmText="OK"
+                cancelText={statusModalConfig.type === 'danger' && statusModalConfig.title.includes('Hapus') ? 'Batal' : null}
+                onConfirm={statusModalConfig.onConfirm}
+                onCancel={() => setShowStatusModal(false)}
+            />
+        </View >
     );
 }

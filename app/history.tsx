@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,7 @@ import { generateReceiptText } from '../utils/receiptGenerator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useOffline } from '../context/OfflineContext';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 
 export default function HistoryScreen() {
     const router = useRouter();
@@ -35,6 +36,19 @@ export default function HistoryScreen() {
         storeAddress: 'Alamat Toko',
         storePhone: '',
     });
+
+    // Confirmation Modal State
+    const [confirmModal, setConfirmModal] = useState({
+        visible: false,
+        title: '',
+        message: '',
+        confirmText: 'Ya',
+        cancelText: 'Batal' as string | null,
+        type: 'danger' as 'danger' | 'warning' | 'success' | 'info',
+        onConfirm: async () => { }
+    });
+
+    const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, visible: false }));
 
     useEffect(() => {
         loadSettings();
@@ -110,6 +124,7 @@ export default function HistoryScreen() {
                         quantity,
                         price,
                         product_name,
+                        product_id,
                         product:products(id, name, image_url)
                     )
                 `)
@@ -144,13 +159,41 @@ export default function HistoryScreen() {
 
             if (error) throw error;
 
-            // Map data to handle renamed fields if necessary
-            const mappedData = (data || []).map((t: any) => ({
-                ...t,
-                items: t.transaction_items || []
-            }));
+            // Manual Fetch Profiles to avoid Foreign Key issues
+            let transactionsWithProfiles = data || [];
+            try {
+                const userIds = [...new Set((data || []).map((t: any) => t.user_id).filter(Boolean))];
+                if (userIds.length > 0) {
+                    const { data: profiles } = await supabase
+                        .from('profiles')
+                        .select('id, full_name')
+                        .in('id', userIds);
 
-            setTransactions(mappedData);
+                    const profileMap = (profiles || []).reduce((acc: any, profile: any) => {
+                        acc[profile.id] = profile;
+                        return acc;
+                    }, {});
+
+                    transactionsWithProfiles = (data || []).map((t: any) => ({
+                        ...t,
+                        user: profileMap[t.user_id] || null,
+                        items: t.transaction_items || []
+                    }));
+                } else {
+                    transactionsWithProfiles = (data || []).map((t: any) => ({
+                        ...t,
+                        items: t.transaction_items || []
+                    }));
+                }
+            } catch (err) {
+                console.log('Error manually fetching profiles', err);
+                transactionsWithProfiles = (data || []).map((t: any) => ({
+                    ...t,
+                    items: t.transaction_items || []
+                }));
+            }
+
+            setTransactions(transactionsWithProfiles);
         } catch (error: any) {
             if (timeoutId) clearTimeout(timeoutId);
             console.error('Error fetching transactions:', error);
@@ -158,7 +201,15 @@ export default function HistoryScreen() {
             if (error.name === 'AbortError') {
                 console.log('Transaction fetch timed out/aborted.');
             } else {
-                Alert.alert('Error', 'Gagal memuat data transaksi');
+                setConfirmModal({
+                    visible: true,
+                    title: 'Error',
+                    message: 'Gagal memuat data transaksi',
+                    confirmText: 'OK',
+                    cancelText: null,
+                    type: 'danger',
+                    onConfirm: async () => closeConfirmModal()
+                });
             }
         } finally {
             setLoading(false);
@@ -166,68 +217,106 @@ export default function HistoryScreen() {
     };
 
     const handleDeleteTransaction = (id: string) => {
-        Alert.alert(
-            'Hapus Transaksi',
-            'Apakah Anda yakin ingin menghapus transaksi ini? Data tidak dapat dikembalikan.',
-            [
-                { text: 'Batal', style: 'cancel' },
-                {
-                    text: 'Hapus',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            const { error } = await supabase
-                                .from('transactions')
-                                .delete()
-                                .eq('id', id);
+        setConfirmModal({
+            visible: true,
+            title: 'Hapus Transaksi',
+            message: 'Apakah Anda yakin ingin menghapus transaksi ini? Data tidak dapat dikembalikan.',
+            confirmText: 'Hapus',
+            cancelText: 'Batal',
+            type: 'danger',
+            onConfirm: async () => {
+                try {
+                    closeConfirmModal();
+                    const { error } = await supabase
+                        .from('transactions')
+                        .delete()
+                        .eq('id', id);
 
-                            if (error) throw error;
+                    if (error) throw error;
 
-                            setTransactions(prev => prev.filter(t => t.id !== id));
-                            setSelectedTransaction(null);
-                            Alert.alert('Sukses', 'Transaksi berhasil dihapus.');
-                        } catch (error: any) {
-                            Alert.alert('Gagal', `Gagal menghapus: ${error.message}. Cek izin database.`);
-                        }
-                    }
+                    setTransactions(prev => prev.filter(t => t.id !== id));
+                    setSelectedTransaction(null);
+
+                    setTimeout(() => {
+                        setConfirmModal({
+                            visible: true,
+                            title: 'Sukses',
+                            message: 'Transaksi berhasil dihapus.',
+                            confirmText: 'Tutup',
+                            cancelText: null,
+                            type: 'success',
+                            onConfirm: async () => closeConfirmModal()
+                        });
+                    }, 300);
+                } catch (error: any) {
+                    setTimeout(() => {
+                        setConfirmModal({
+                            visible: true,
+                            title: 'Gagal',
+                            message: `Gagal menghapus: ${error.message}. Cek izin database.`,
+                            confirmText: 'Tutup',
+                            cancelText: null,
+                            type: 'danger',
+                            onConfirm: async () => closeConfirmModal()
+                        });
+                    }, 300);
                 }
-            ]
-        );
+            }
+        });
     };
 
     const handleUpdateStatus = (id: string, newStatus: string, label: string) => {
-        Alert.alert(
-            `Konfirmasi ${label}`,
-            `Ubah status transaksi terpilih menjadi "${newStatus}"?`,
-            [
-                { text: 'Batal', style: 'cancel' },
-                {
-                    text: 'Ya, Lanjutkan',
-                    onPress: async () => {
-                        try {
-                            const { error } = await supabase
-                                .from('transactions')
-                                .update({ status: newStatus })
-                                .eq('id', id);
+        setConfirmModal({
+            visible: true,
+            title: `Konfirmasi ${label}`,
+            message: `Ubah status transaksi terpilih menjadi "${newStatus}"?`,
+            confirmText: 'Ya, Lanjutkan',
+            cancelText: 'Batal',
+            type: 'warning',
+            onConfirm: async () => {
+                try {
+                    closeConfirmModal();
+                    const { error } = await supabase
+                        .from('transactions')
+                        .update({ status: newStatus })
+                        .eq('id', id);
 
-                            if (error) throw error;
+                    if (error) throw error;
 
-                            setTransactions(prev => prev.map(t =>
-                                t.id === id ? { ...t, status: newStatus } as any : t
-                            ));
+                    setTransactions(prev => prev.map(t =>
+                        t.id === id ? { ...t, status: newStatus } as any : t
+                    ));
 
-                            if (selectedTransaction) {
-                                setSelectedTransaction(prev => prev ? { ...prev, status: newStatus } as any : null);
-                            }
-
-                            Alert.alert('Sukses', `Status berhasil diubah menjadi ${newStatus}.`);
-                        } catch (error: any) {
-                            Alert.alert('Gagal', `Gagal mengubah status: ${error.message}.`);
-                        }
+                    if (selectedTransaction) {
+                        setSelectedTransaction(prev => prev ? { ...prev, status: newStatus } as any : null);
                     }
+
+                    setTimeout(() => {
+                        setConfirmModal({
+                            visible: true,
+                            title: 'Sukses',
+                            message: `Status berhasil diubah menjadi ${newStatus}.`,
+                            confirmText: 'OK',
+                            cancelText: null,
+                            type: 'success',
+                            onConfirm: async () => closeConfirmModal()
+                        });
+                    }, 300);
+                } catch (error: any) {
+                    setTimeout(() => {
+                        setConfirmModal({
+                            visible: true,
+                            title: 'Gagal',
+                            message: `Gagal mengubah status: ${error.message}.`,
+                            confirmText: 'Tutup',
+                            cancelText: null,
+                            type: 'danger',
+                            onConfirm: async () => closeConfirmModal()
+                        });
+                    }, 300);
                 }
-            ]
-        );
+            }
+        });
     };
 
     const handlePrint = async () => {
@@ -254,7 +343,15 @@ export default function HistoryScreen() {
             await printReceipt(text);
         } catch (error) {
             console.error(error);
-            Alert.alert('Gagal Print', 'Terjadi kesalahan saat mencetak.');
+            setConfirmModal({
+                visible: true,
+                title: 'Gagal Print',
+                message: 'Terjadi kesalahan saat mencetak. Pastikan printer terhubung.',
+                confirmText: 'Tutup',
+                cancelText: null,
+                type: 'danger',
+                onConfirm: async () => closeConfirmModal()
+            });
         }
     };
 
@@ -388,7 +485,7 @@ export default function HistoryScreen() {
                                         </Text>
                                         {item.items?.some((i: any) => !i.product_id) && (
                                             <View style={tw`bg-purple-100 px-2 py-0.5 rounded-md`}>
-                                                <Text style={tw`text-purple-700 text-[10px] font-bold`}>MANUAL</Text>
+                                                <Text style={tw`text-purple-700 text-[10px] font-bold`}>ITEM MANUAL</Text>
                                             </View>
                                         )}
                                     </View>
@@ -404,11 +501,40 @@ export default function HistoryScreen() {
                                     <Text style={tw`text-xs text-gray-500`}>
                                         {formatDate(item.created_at)}
                                     </Text>
+                                    {item.user?.full_name && (
+                                        <View style={tw`flex-row items-center gap-1 mb-0.5`}>
+                                            <UserIcon size={10} color="#6b7280" />
+                                            <Text style={tw`text-xs text-gray-600`}>
+                                                {item.user.full_name}
+                                            </Text>
+                                        </View>
+                                    )}
                                     {item.table_number && (
                                         <View style={tw`bg-orange-100 self-start px-2 py-0.5 rounded-md mt-1`}>
                                             <Text style={tw`text-orange-700 text-xs font-bold`}>Meja {item.table_number}</Text>
                                         </View>
                                     )}
+
+                                    {/* Product Summary */}
+                                    <View style={tw`mt-2 flex-row flex-wrap gap-1`}>
+                                        <Text style={tw`text-xs text-gray-600 font-medium`} numberOfLines={2}>
+                                            {item.items && item.items.length > 0 ? (
+                                                <>
+                                                    {item.items.slice(0, 2).map((i: any, idx: number) => (
+                                                        <Text key={idx}>
+                                                            {i.product_name || (i.product?.name) || 'Produk'}
+                                                            {idx < Math.min(item.items.length, 2) - 1 ? ', ' : ''}
+                                                        </Text>
+                                                    ))}
+                                                    {item.items.length > 2 && (
+                                                        <Text style={tw`text-blue-600 font-bold`}> +{item.items.length - 2} lainnya</Text>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <Text style={tw`text-gray-400 italic`}>Tidak ada rincian produk</Text>
+                                            )}
+                                        </Text>
+                                    </View>
                                 </View>
                             </View>
                             <View style={tw`px-2 py-1 rounded-full ${getStatusColor(item.status).split(' ')[0]}`}>
@@ -542,6 +668,7 @@ export default function HistoryScreen() {
                                         <View style={tw`flex-1 mr-4`}>
                                             <Text style={tw`font-medium text-gray-900`}>
                                                 {item.product?.name || item.product_name || 'Produk dihapus'}
+                                                {!item.product_id && <Text style={tw`text-purple-600 font-bold text-xs`}> (Manual)</Text>}
                                             </Text>
                                             <Text style={tw`text-gray-500 text-xs`}>
                                                 {item.quantity} x Rp {(item.price || 0).toLocaleString('id-ID')}
@@ -603,6 +730,17 @@ export default function HistoryScreen() {
                     </View>
                 )}
             </Modal>
+
+            <ConfirmationModal
+                visible={confirmModal.visible}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                confirmText={confirmModal.confirmText}
+                cancelText={confirmModal.cancelText}
+                type={confirmModal.type}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={closeConfirmModal}
+            />
         </View>
     );
 }

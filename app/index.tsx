@@ -18,19 +18,23 @@ import { ManualItemModal } from '../components/ManualItemModal';
 import { CartFab } from '../components/CartFab';
 import { CartPanel } from '../components/CartPanel';
 import { RecallModal } from '../components/RecallModal';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 import { ShoppingCart, Search, X, Archive } from 'lucide-react-native';
 import { useCart } from '../context/CartContext';
 import { useStore } from '../context/StoreContext';
+import { useRegister } from '../context/RegisterContext';
+import { useAuth } from '../context/AuthContext';
 import tw from 'twrnc';
 
 export default function Home() {
     const router = useRouter();
     const { width } = useWindowDimensions();
     const isSplitView = width > 600; // Lowered from 768 for 8.7-inch tablet optimization
-    const { heldOrders } = useCart();
+    const { heldOrders, showShiftWarning, setShowShiftWarning } = useCart();
 
     // UI Preferences via Unified Store Context
     const { settings } = useStore();
+    const { role } = useAuth();
     const { showTable, showRecall: showRecallPref, showGuest, showManual } = settings;
 
     // Responsive Column Calculation
@@ -57,8 +61,13 @@ export default function Home() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
-    const [showRecallModal, setShowRecallModal] = useState(false); // Renamed to avoid conflict with useUIPreferences
+    const [showRecallModal, setShowRecallModal] = useState(false);
+    const [showShiftOverlay, setShowShiftOverlay] = useState(true);
     const { isOnline } = useOffline();
+    const { activeRegister } = useRegister(); // Import useRegister
+
+    // Add explicit log for debugging
+    console.log('[Home] Debug State:', { enforceShift: settings.enforceShift, activeRegister: !!activeRegister });
 
     useFocusEffect(
         useCallback(() => {
@@ -69,7 +78,7 @@ export default function Home() {
     useEffect(() => {
         const timer = setTimeout(() => {
             if (loading) {
-                console.warn('[Home] ⚠️ LOADING TIMEOUT (10s)! Forcing loading = false.');
+                console.log('[Home] ⚠️ LOADING TIMEOUT (10s)! Forcing loading = false.');
                 setLoading(false);
             }
         }, 10000);
@@ -170,10 +179,13 @@ export default function Home() {
         );
     }
 
+    const isCashier = role === 'kasir' || role === 'cashier';
+    const isShiftLocked = settings.enforceShift && !activeRegister && isCashier;
+
     return (
         <View style={tw`flex-1 flex-row bg-gray-50`}>
             {/* Main Content (Products) */}
-            <View style={tw`flex-1 flex-col`}>
+            <View style={tw`flex-1 flex-col relative`}>
                 <Header />
 
                 {/* Search Bar */}
@@ -187,8 +199,9 @@ export default function Home() {
                             onChangeText={setSearchQuery}
                             autoCapitalize="none"
                             placeholderTextColor="#9ca3af"
+                            editable={!isShiftLocked}
                         />
-                        {searchQuery.length > 0 && (
+                        {searchQuery.length > 0 && !isShiftLocked && (
                             <TouchableOpacity onPress={() => setSearchQuery('')}>
                                 <X size={18} color="#6b7280" />
                             </TouchableOpacity>
@@ -197,15 +210,17 @@ export default function Home() {
                 </View>
 
                 {/* Optional Action Bar */}
-                {(showTable || showRecallPref || showGuest || showManual) && (
-                    <View style={tw`bg-white px-3 py-2 flex-row gap-2`}>
+                {(showTable || showRecallPref || showGuest || showManual || true) && (
+                    <View style={tw`bg-white px-3 py-2 flex-row gap-2 flex-wrap`}>
+
                         {showTable && <TableSelector />}
 
                         {/* Recall Button */}
                         {showRecallPref && (
                             <TouchableOpacity
-                                onPress={() => setShowRecallModal(true)}
-                                style={tw`flex-row items-center justify-center bg-orange-50 px-3 py-3 rounded-xl border border-orange-100 relative`}
+                                onPress={() => !isShiftLocked && setShowRecallModal(true)}
+                                style={tw`flex-row items-center justify-center bg-orange-50 px-3 py-3 rounded-xl border border-orange-100 relative ${isShiftLocked ? 'opacity-50' : ''}`}
+                                disabled={isShiftLocked}
                             >
                                 <Archive size={18} color="#d97706" />
                                 {heldOrders.length > 0 && (
@@ -218,10 +233,11 @@ export default function Home() {
 
                         {showGuest && <CustomerSelector />}
 
-                        {/* Short-cut to Add Purchase - Always visible or user didn't ask to hide it? Assuming keep it for now as user didn't mention it. */}
+                        {/* Short-cut to Add Purchase */}
                         <TouchableOpacity
-                            onPress={() => router.push('/purchases/add' as any)}
-                            style={tw`flex-1 flex-row items-center justify-center bg-orange-100 px-1 py-3 rounded-xl border border-orange-200`}
+                            onPress={() => !isShiftLocked && router.push('/purchases/add' as any)}
+                            style={tw`flex-1 flex-row items-center justify-center bg-orange-100 px-1 py-3 rounded-xl border border-orange-200 ${isShiftLocked ? 'opacity-50' : ''}`}
+                            disabled={isShiftLocked}
                         >
                             <ShoppingCart size={16} color="#ea580c" />
                             <Text style={tw`ml-1 font-bold text-orange-700 text-[10px]`} numberOfLines={1}>Beli Stok</Text>
@@ -235,13 +251,13 @@ export default function Home() {
                     <CategoryFilter
                         categories={categories}
                         selectedCategory={selectedCategory}
-                        onSelectCategory={setSelectedCategory}
+                        onSelectCategory={isShiftLocked ? () => { } : setSelectedCategory}
                     />
                 </View>
 
                 <FlatList
                     key={isSplitView ? `split-${numColumns}` : `mobile-${numColumns}`}
-                    data={filteredProducts}
+                    data={isShiftLocked ? [] : filteredProducts}
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => <ProductCard product={item} />}
                     numColumns={numColumns}
@@ -249,22 +265,69 @@ export default function Home() {
                     columnWrapperStyle={tw`justify-between`}
                     ListEmptyComponent={
                         <View style={tw`flex-1 items-center justify-center py-20`}>
-                            <Text style={tw`text-gray-500`}>Tidak ada produk ditemukan</Text>
+                            <Text style={tw`text-gray-500`}>
+                                {isShiftLocked ? 'Silakan buka shift kasir terlebih dahulu' : 'Tidak ada produk ditemukan'}
+                            </Text>
                         </View>
                     }
+                    scrollEnabled={!isShiftLocked}
                 />
 
-                {!isSplitView && <CartFab />}
+                {/* Shift Block Overlay */}
+                {isShiftLocked && showShiftOverlay && (
+                    <View style={tw`absolute top-[56px] bottom-0 left-0 right-0 bg-white/80 z-50 items-center justify-center p-6 mb-24`}>
+                        <View style={tw`bg-white p-6 rounded-3xl shadow-xl items-center border border-gray-100 w-full max-w-xs`}>
+                            <View style={tw`bg-orange-100 p-4 rounded-full mb-4`}>
+                                <ShoppingCart size={32} color="#ea580c" />
+                            </View>
+                            <Text style={tw`text-xl font-bold text-gray-900 text-center mb-2`}>Shift Belum Dibuka</Text>
+                            <Text style={tw`text-gray-500 text-center mb-6 text-sm leading-5`}>
+                                Anda wajib membuka shift kasir sebelum dapat melakukan transaksi atau mengelola pesanan.
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => router.push('/register' as any)}
+                                style={tw`bg-blue-600 px-6 py-3 rounded-xl shadow-lg w-full items-center mb-3`}
+                            >
+                                <Text style={tw`text-white font-bold`}>Buka Shift Sekarang</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setShowShiftOverlay(false)}
+                                style={tw`bg-gray-100 px-6 py-3 rounded-xl w-full items-center`}
+                            >
+                                <Text style={tw`text-gray-600 font-bold`}>Batal</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+
+                {!isSplitView && !isShiftLocked && <CartFab />}
             </View>
 
             {/* Right Panel (Cart - Desktop Only) */}
             {isSplitView && (
-                <View style={[tw`h-full`, { width: panelWidth }]}>
+                <View style={[tw`h-full relative`, { width: panelWidth }]}>
                     <CartPanel />
+                    {isShiftLocked && (
+                        <View style={tw`absolute inset-0 bg-white/40 z-50`} />
+                    )}
                 </View>
             )}
 
             <RecallModal visible={showRecallModal} onClose={() => setShowRecallModal(false)} />
+
+            <ConfirmationModal
+                visible={showShiftWarning}
+                title="Shift Belum Dibuka"
+                message="Anda telah mengaktifkan 'Wajib Buka Shift'. Silakan buka shift kasir terlebih dahulu di menu Kasir untuk dapat melakukan transaksi."
+                confirmText="Buka Shift Sekarang"
+                cancelText="Batal"
+                type="warning"
+                onConfirm={() => {
+                    setShowShiftWarning(false);
+                    router.push('/register' as any);
+                }}
+                onCancel={() => setShowShiftWarning(false)}
+            />
         </View>
     );
 }

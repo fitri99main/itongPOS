@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Image, Alert, ScrollView, Clipboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Image, ScrollView } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useLicense } from '../context/LicenseContext';
 import { Shield, Key, Copy, CheckCircle, Info, RefreshCw } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 
 export default function ActivateScreen() {
     const router = useRouter();
@@ -13,9 +15,24 @@ export default function ActivateScreen() {
     const [serial, setSerial] = useState('');
     const [loading, setLoading] = useState(false);
 
+    // Notification Modal State
+    const [showStatusModal, setShowStatusModal] = useState(false);
+    const [statusModalConfig, setStatusModalConfig] = useState({
+        title: '',
+        message: '',
+        type: 'info' as 'info' | 'success' | 'danger' | 'warning',
+        onConfirm: () => { }
+    });
+
     const handleActivate = async () => {
         if (!serial.trim()) {
-            Alert.alert('Peringatan', 'Mohon masukkan Serial Number Anda.');
+            setStatusModalConfig({
+                title: 'Peringatan',
+                message: 'Mohon masukkan Serial Number Anda.',
+                type: 'warning',
+                onConfirm: () => setShowStatusModal(false)
+            });
+            setShowStatusModal(true);
             return;
         }
 
@@ -24,17 +41,36 @@ export default function ActivateScreen() {
         setLoading(false);
 
         if (result.success) {
-            Alert.alert('Sukses', result.message, [
-                { text: 'Lanjut ke Aplikasi', onPress: () => router.replace('/login') }
-            ]);
+            setStatusModalConfig({
+                title: 'Sukses',
+                message: result.message,
+                type: 'success',
+                onConfirm: () => {
+                    setShowStatusModal(false);
+                    router.replace('/login');
+                }
+            });
+            setShowStatusModal(true);
         } else {
-            Alert.alert('Gagal', result.message);
+            setStatusModalConfig({
+                title: 'Gagal',
+                message: result.message,
+                type: 'danger',
+                onConfirm: () => setShowStatusModal(false)
+            });
+            setShowStatusModal(true);
         }
     };
 
     const copyToClipboard = () => {
-        Clipboard.setString(deviceId);
-        Alert.alert('Sukses', 'Device ID disalin ke clipboard.');
+        Clipboard.setStringAsync(deviceId);
+        setStatusModalConfig({
+            title: 'Sukses',
+            message: 'Device ID disalin ke clipboard.',
+            type: 'success',
+            onConfirm: () => setShowStatusModal(false)
+        });
+        setShowStatusModal(true);
     };
 
     if (statusLoading) {
